@@ -14,6 +14,12 @@ import { newId } from "@/utils/id";
 const SESSION_KEY = "@tripulante-gestao/session/v2";
 const MEMBERS_KEY = "@tripulante-gestao/members/v2";
 
+const DEFAULT_ADMIN = {
+  name: "André Santos",
+  crewId: "180939",
+  password: "andres91",
+};
+
 export type AccountStatus = "pending" | "active";
 
 export interface CrewMember {
@@ -74,9 +80,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(MEMBERS_KEY),
           AsyncStorage.getItem(SESSION_KEY),
         ]);
-        const loadedMembers: CrewMember[] = rawMembers
+        let loadedMembers: CrewMember[] = rawMembers
           ? JSON.parse(rawMembers)
           : [];
+        if (loadedMembers.length === 0) {
+          const seed: CrewMember = {
+            id: newId(),
+            name: DEFAULT_ADMIN.name,
+            crewId: DEFAULT_ADMIN.crewId,
+            passwordHash: hashPassword(DEFAULT_ADMIN.password),
+            status: "active",
+            isAdmin: true,
+            createdAt: new Date().toISOString(),
+            approvedAt: new Date().toISOString(),
+          };
+          loadedMembers = [seed];
+          await AsyncStorage.setItem(
+            MEMBERS_KEY,
+            JSON.stringify(loadedMembers),
+          );
+        }
         setMembers(loadedMembers);
         if (rawSession) {
           const sessionId: string = JSON.parse(rawSession);
