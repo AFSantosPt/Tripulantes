@@ -1,24 +1,24 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  FlatList,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { EmptyState } from "@/components/EmptyState";
-import { StatPill } from "@/components/StatPill";
+import { MonthCalendar } from "@/components/MonthCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useShifts, ShiftWithCalc } from "@/contexts/ShiftsContext";
 import { useColors } from "@/hooks/useColors";
 import {
   AFFECTATION_LABELS,
-  formatDateLong,
+  dateYear,
+  formatDayHeadline,
   formatHoursDecimal,
   formatMinutesToTime,
   isoMonthKey,
@@ -33,12 +33,14 @@ export default function ShiftsScreen() {
   const { user, signOut } = useAuth();
   const { shifts } = useShifts();
 
-  const currentMonthKey = isoMonthKey(todayIso());
+  const today = todayIso();
+  const [selectedDate, setSelectedDate] = useState<string>(today);
+
+  const currentMonthKey = isoMonthKey(selectedDate);
   const monthShifts = useMemo(
     () => shifts.filter((s) => isoMonthKey(s.date) === currentMonthKey),
     [shifts, currentMonthKey],
   );
-
   const monthTotals = useMemo(() => {
     return monthShifts.reduce(
       (acc, s) => {
@@ -51,189 +53,228 @@ export default function ShiftsScreen() {
     );
   }, [monthShifts]);
 
+  const markedDates = useMemo(
+    () => Array.from(new Set(shifts.map((s) => s.date))),
+    [shifts],
+  );
+
+  const dayShifts = useMemo(
+    () =>
+      shifts
+        .filter((s) => s.date === selectedDate)
+        .sort((a, b) => a.startMinutes - b.startMinutes),
+    [shifts, selectedDate],
+  );
+
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? Math.max(insets.top, 67) : insets.top;
   const bottomTab = isWeb ? 84 : 70 + insets.bottom;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <FlatList
-        data={shifts}
-        keyExtractor={(item) => item.id}
+      <ScrollView
         contentContainerStyle={{
           paddingTop: topPad + 8,
           paddingBottom: bottomTab + 24,
           paddingHorizontal: 20,
+          gap: 16,
         }}
-        ListHeaderComponent={
-          <View style={{ marginBottom: 18 }}>
-            <View style={styles.headerRow}>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[styles.greeting, { color: colors.mutedForeground }]}
-                >
-                  {greetingFor()}
-                </Text>
-                <Text style={[styles.name, { color: colors.foreground }]}>
-                  {user?.name ?? "Tripulante"}
-                </Text>
-              </View>
-              <Pressable
-                onPress={signOut}
-                style={({ pressed }) => [
-                  styles.iconBtn,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
-                    borderRadius: colors.radius,
-                    opacity: pressed ? 0.85 : 1,
-                  },
-                ]}
-              >
-                <Feather
-                  name="log-out"
-                  size={18}
-                  color={colors.mutedForeground}
-                />
-              </Pressable>
-            </View>
+      >
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.greeting, { color: colors.mutedForeground }]}>
+              {greetingFor()}
+            </Text>
+            <Text style={[styles.name, { color: colors.foreground }]}>
+              {user?.name ?? "Tripulante"}
+            </Text>
+          </View>
+          <Pressable
+            onPress={signOut}
+            style={({ pressed }) => [
+              styles.iconBtn,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                borderRadius: colors.radius,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Feather
+              name="log-out"
+              size={18}
+              color={colors.mutedForeground}
+            />
+          </Pressable>
+        </View>
 
-            <View
-              style={[
-                styles.summaryCard,
-                {
-                  backgroundColor: colors.primary,
-                  borderRadius: colors.radius + 4,
-                },
-              ]}
-            >
+        <View
+          style={[
+            styles.summaryCard,
+            {
+              backgroundColor: colors.primary,
+              borderRadius: colors.radius + 4,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.summaryLabel,
+              { color: colors.primaryForeground, opacity: 0.7 },
+            ]}
+          >
+            {monthLabel(currentMonthKey).toUpperCase()}
+          </Text>
+          <Text
+            style={[styles.summaryHours, { color: colors.primaryForeground }]}
+          >
+            {formatMinutesToTime(monthTotals.total)}
+          </Text>
+          <Text
+            style={[
+              styles.summarySub,
+              { color: colors.primaryForeground, opacity: 0.7 },
+            ]}
+          >
+            {formatHoursDecimal(monthTotals.total)} h · {monthShifts.length}{" "}
+            serviço{monthShifts.length === 1 ? "" : "s"}
+          </Text>
+          <View style={styles.summaryStats}>
+            <View style={styles.summaryStat}>
               <Text
                 style={[
-                  styles.summaryLabel,
-                  { color: colors.primaryForeground, opacity: 0.7 },
+                  styles.summaryStatLabel,
+                  { color: colors.primaryForeground, opacity: 0.6 },
                 ]}
               >
-                {monthLabel(currentMonthKey).toUpperCase()}
+                Normais
               </Text>
               <Text
                 style={[
-                  styles.summaryHours,
+                  styles.summaryStatValue,
                   { color: colors.primaryForeground },
                 ]}
               >
-                {formatMinutesToTime(monthTotals.total)}
+                {formatMinutesToTime(monthTotals.normal)}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.summaryDivider,
+                {
+                  backgroundColor: colors.primaryForeground,
+                  opacity: 0.15,
+                },
+              ]}
+            />
+            <View style={styles.summaryStat}>
+              <Text
+                style={[
+                  styles.summaryStatLabel,
+                  { color: colors.accent, opacity: 0.95 },
+                ]}
+              >
+                Extras
               </Text>
               <Text
                 style={[
-                  styles.summarySub,
-                  { color: colors.primaryForeground, opacity: 0.7 },
+                  styles.summaryStatValue,
+                  { color: colors.accent },
                 ]}
               >
-                {formatHoursDecimal(monthTotals.total)} h ·{" "}
-                {monthShifts.length} serviço
-                {monthShifts.length === 1 ? "" : "s"}
+                {formatMinutesToTime(monthTotals.extra)}
               </Text>
-              <View style={styles.summaryStats}>
-                <View style={styles.summaryStat}>
-                  <Text
-                    style={[
-                      styles.summaryStatLabel,
-                      { color: colors.primaryForeground, opacity: 0.6 },
-                    ]}
-                  >
-                    Normais
-                  </Text>
-                  <Text
-                    style={[
-                      styles.summaryStatValue,
-                      { color: colors.primaryForeground },
-                    ]}
-                  >
-                    {formatMinutesToTime(monthTotals.normal)}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.summaryDivider,
-                    { backgroundColor: colors.primaryForeground, opacity: 0.15 },
-                  ]}
-                />
-                <View style={styles.summaryStat}>
-                  <Text
-                    style={[
-                      styles.summaryStatLabel,
-                      { color: colors.accent, opacity: 0.95 },
-                    ]}
-                  >
-                    Extras
-                  </Text>
-                  <Text
-                    style={[
-                      styles.summaryStatValue,
-                      { color: colors.accent },
-                    ]}
-                  >
-                    {formatMinutesToTime(monthTotals.extra)}
-                  </Text>
-                </View>
-              </View>
             </View>
+          </View>
+        </View>
 
-            <View style={styles.actionsRow}>
-              <StatPill
-                label="Total registado"
-                value={formatMinutesToTime(
-                  shifts.reduce((acc, s) => acc + s.totalMinutes, 0),
-                )}
-              />
-              <Pressable
-                onPress={() => router.push("/shift-new")}
-                style={({ pressed }) => [
-                  styles.addBtn,
-                  {
-                    backgroundColor: colors.accent,
-                    borderRadius: colors.radius,
-                    opacity: pressed ? 0.9 : 1,
-                  },
-                ]}
-              >
-                <Feather
-                  name="plus"
-                  size={18}
-                  color={colors.accentForeground}
-                />
-                <Text
-                  style={[
-                    styles.addBtnLabel,
-                    { color: colors.accentForeground },
-                  ]}
-                >
-                  Novo serviço
-                </Text>
-              </Pressable>
-            </View>
+        <View
+          style={[
+            styles.dateBanner,
+            {
+              backgroundColor: colors.accent,
+              borderRadius: colors.radius + 4,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.dateBannerYear,
+              { color: colors.accentForeground, opacity: 0.7 },
+            ]}
+          >
+            {dateYear(selectedDate)}
+          </Text>
+          <Text
+            style={[styles.dateBannerHeadline, { color: colors.accentForeground }]}
+          >
+            {formatDayHeadline(selectedDate)}
+          </Text>
+        </View>
 
+        <MonthCalendar
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          markedDates={markedDates}
+          todayIso={today}
+        />
+
+        <View style={styles.dayHeader}>
+          <Text style={[styles.dayTitle, { color: colors.foreground }]}>
+            Serviços do dia
+          </Text>
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: "/shift-new",
+                params: { date: selectedDate },
+              })
+            }
+            style={({ pressed }) => [
+              styles.addBtn,
+              {
+                backgroundColor: colors.accent,
+                borderRadius: colors.radius,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Feather name="plus" size={16} color={colors.accentForeground} />
             <Text
-              style={[
-                styles.listTitle,
-                { color: colors.mutedForeground, marginTop: 24 },
-              ]}
+              style={[styles.addBtnLabel, { color: colors.accentForeground }]}
             >
-              Histórico
+              Novo
+            </Text>
+          </Pressable>
+        </View>
+
+        {dayShifts.length === 0 ? (
+          <View
+            style={[
+              styles.emptyDay,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                borderRadius: colors.radius,
+              },
+            ]}
+          >
+            <Feather name="calendar" size={22} color={colors.mutedForeground} />
+            <Text
+              style={[styles.emptyDayText, { color: colors.mutedForeground }]}
+            >
+              Sem serviços neste dia.
             </Text>
           </View>
-        }
-        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-        renderItem={({ item }) => <ShiftRow shift={item} />}
-        ListEmptyComponent={
-          <EmptyState
-            icon="calendar"
-            title="Sem serviços registados"
-            description="Adiciona o teu primeiro serviço para começar a contabilizar horas normais e extras."
-          />
-        }
-        scrollEnabled={shifts.length > 0}
-      />
+        ) : (
+          <View style={{ gap: 12 }}>
+            {dayShifts.map((s) => (
+              <ServiceCard key={s.id} shift={s} />
+            ))}
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -246,31 +287,49 @@ function greetingFor(): string {
   return "Boa noite";
 }
 
-function ShiftRow({ shift }: { shift: ShiftWithCalc }) {
+function ServiceCard({ shift }: { shift: ShiftWithCalc }) {
   const colors = useColors();
+  const router = useRouter();
+  const codeLabel = shift.code?.trim() || "Sem código";
+  const vehicleLabel = shift.vehicleCode?.trim();
+  const affLabel =
+    shift.affectationLabel?.trim() || AFFECTATION_LABELS[shift.affectation];
+
   return (
-    <View
-      style={[
-        styles.row,
+    <Pressable
+      onLongPress={() =>
+        router.push({
+          pathname: "/shift-new",
+          params: { date: shift.date },
+        })
+      }
+      style={({ pressed }) => [
+        styles.card,
         {
           backgroundColor: colors.card,
           borderColor: colors.border,
           borderRadius: colors.radius,
+          opacity: pressed ? 0.96 : 1,
         },
       ]}
     >
-      <View style={styles.rowHead}>
-        <Text style={[styles.rowDate, { color: colors.foreground }]}>
-          {formatDateLong(shift.date)}
-        </Text>
+      <View style={styles.cardHead}>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={[styles.cardKicker, { color: colors.mutedForeground }]}
+          >
+            Serviço
+          </Text>
+          <Text style={[styles.cardCode, { color: colors.primary }]}>
+            {codeLabel}
+          </Text>
+        </View>
         <View
           style={[
             styles.tag,
             {
               backgroundColor:
-                shift.affectation === "normal"
-                  ? colors.muted
-                  : colors.accent,
+                shift.affectation === "normal" ? colors.muted : colors.accent,
               borderRadius: 999,
             },
           ]}
@@ -286,37 +345,46 @@ function ShiftRow({ shift }: { shift: ShiftWithCalc }) {
               },
             ]}
           >
-            {AFFECTATION_LABELS[shift.affectation]}
+            {affLabel}
           </Text>
         </View>
       </View>
 
-      <View style={styles.rowTimes}>
-        <View style={styles.timeBlock}>
-          <Text style={[styles.timeLabel, { color: colors.mutedForeground }]}>
-            Início
-          </Text>
-          <Text style={[styles.timeValue, { color: colors.foreground }]}>
-            {formatMinutesToTime(shift.startMinutes)}
-          </Text>
-        </View>
-        <Feather name="arrow-right" size={16} color={colors.mutedForeground} />
-        <View style={styles.timeBlock}>
-          <Text style={[styles.timeLabel, { color: colors.mutedForeground }]}>
-            Fim
-          </Text>
-          <Text style={[styles.timeValue, { color: colors.foreground }]}>
-            {formatMinutesToTime(shift.endMinutes)}
+      {vehicleLabel ? (
+        <View style={styles.vehicleRow}>
+          <Feather name="truck" size={13} color={colors.mutedForeground} />
+          <Text
+            style={[styles.vehicleText, { color: colors.mutedForeground }]}
+          >
+            Serviço de Viatura:{" "}
+            <Text style={{ color: colors.foreground }}>{vehicleLabel}</Text>
           </Text>
         </View>
+      ) : null}
+
+      <View style={[styles.stopsBox, { borderTopColor: colors.border }]}>
+        {shift.stops.map((stop, idx) => (
+          <View key={idx} style={styles.stopRow}>
+            <Text
+              style={[styles.stopLocation, { color: colors.foreground }]}
+              numberOfLines={1}
+            >
+              {stop.location?.trim() || "—"}
+            </Text>
+            <Text style={[styles.stopTime, { color: colors.foreground }]}>
+              {stop.time}
+            </Text>
+          </View>
+        ))}
       </View>
 
-      <View
-        style={[
-          styles.rowFoot,
-          { borderTopColor: colors.border },
-        ]}
-      >
+      {shift.notes ? (
+        <Text style={[styles.notes, { color: colors.mutedForeground }]}>
+          {shift.notes}
+        </Text>
+      ) : null}
+
+      <View style={[styles.cardFoot, { borderTopColor: colors.border }]}>
         <View style={styles.footStat}>
           <Text style={[styles.footLabel, { color: colors.mutedForeground }]}>
             Total
@@ -350,7 +418,7 @@ function ShiftRow({ shift }: { shift: ShiftWithCalc }) {
           </Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -359,7 +427,6 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
   },
   greeting: {
     fontSize: 13,
@@ -390,7 +457,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   summaryHours: {
-    fontSize: 52,
+    fontSize: 44,
     fontFamily: "Inter_700Bold",
     letterSpacing: -2,
     marginTop: 4,
@@ -402,11 +469,10 @@ const styles = StyleSheet.create({
   summaryStats: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 18,
-    gap: 0,
+    marginTop: 14,
   },
   summaryStat: { flex: 1 },
-  summaryDivider: { width: 1, height: 36 },
+  summaryDivider: { width: 1, height: 32 },
   summaryStatLabel: {
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
@@ -414,48 +480,79 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   summaryStatValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
     marginTop: 4,
   },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 14,
+  dateBanner: {
+    paddingHorizontal: 22,
+    paddingVertical: 18,
   },
-  addBtn: {
-    paddingHorizontal: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    minHeight: 50,
-  },
-  addBtnLabel: {
-    fontSize: 14,
+  dateBannerYear: {
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
   },
-  listTitle: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginBottom: 10,
+  dateBannerHeadline: {
+    fontSize: 26,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.6,
+    marginTop: 2,
   },
-  row: {
-    borderWidth: 1,
-    padding: 16,
-  },
-  rowHead: {
+  dayHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginTop: 4,
   },
-  rowDate: {
-    fontSize: 15,
+  dayTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  addBtnLabel: {
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
-    textTransform: "capitalize",
+  },
+  emptyDay: {
+    borderWidth: 1,
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  emptyDayText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+  card: {
+    borderWidth: 1,
+    padding: 16,
+    gap: 10,
+  },
+  cardHead: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  cardKicker: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  cardCode: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    marginTop: 2,
   },
   tag: {
     paddingHorizontal: 10,
@@ -466,29 +563,46 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.4,
   },
-  rowTimes: {
+  vehicleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  vehicleText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+  stopsBox: {
+    borderTopWidth: 1,
+    paddingTop: 10,
+    gap: 6,
+  },
+  stopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
     paddingVertical: 4,
   },
-  timeBlock: { gap: 2 },
-  timeLabel: {
-    fontSize: 11,
+  stopLocation: {
+    flex: 1,
+    fontSize: 14,
     fontFamily: "Inter_500Medium",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
   },
-  timeValue: {
-    fontSize: 22,
+  stopTime: {
+    fontSize: 15,
     fontFamily: "Inter_700Bold",
-    letterSpacing: -0.5,
+    fontVariant: ["tabular-nums"],
   },
-  rowFoot: {
+  notes: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    fontStyle: "italic",
+  },
+  cardFoot: {
     flexDirection: "row",
     borderTopWidth: 1,
-    marginTop: 14,
-    paddingTop: 12,
+    paddingTop: 10,
     gap: 12,
   },
   footStat: { flex: 1 },
@@ -499,8 +613,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   footValue: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
     marginTop: 2,
   },
 });

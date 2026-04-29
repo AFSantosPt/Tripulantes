@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -16,12 +17,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  BREAKDOWN_PHOTO_LIFETIME_DAYS,
+  BreakdownPhoto,
   Confirmation,
   REQUIRED_CONFIRMATIONS_COUNT,
   VEHICLE_LABELS,
   useBreakdowns,
 } from "@/contexts/BreakdownsContext";
 import { useColors } from "@/hooks/useColors";
+import { daysUntilExpiry, pickImageAsDataUri } from "@/utils/imagePicker";
 import { formatRelative } from "@/utils/time";
 
 export default function BreakdownDetailScreen() {
@@ -29,10 +33,18 @@ export default function BreakdownDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { byId, confirmRepair, removeBreakdown } = useBreakdowns();
+  const {
+    byId,
+    confirmRepair,
+    removeBreakdown,
+    addPhoto,
+    removePhoto,
+  } = useBreakdowns();
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [photoFeedback, setPhotoFeedback] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<boolean>(false);
 
   const breakdown = id ? byId(id) : undefined;
 
@@ -102,13 +114,54 @@ export default function BreakdownDetailScreen() {
     }
   };
 
+  const handleAddPhoto = async () => {
+    setPhotoFeedback(null);
+    setUploading(true);
+    try {
+      const picked = await pickImageAsDataUri();
+      if (!picked.ok) {
+        if (picked.reason) setPhotoFeedback(picked.reason);
+        return;
+      }
+      const res = await addPhoto(breakdown.id, picked.image!.dataUri);
+      if (!res.ok) {
+        setPhotoFeedback(res.reason ?? "Não foi possível adicionar a foto");
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemovePhoto = (photo: BreakdownPhoto) => {
+    const proceed = async () => {
+      await removePhoto(breakdown.id, photo.id);
+    };
+    if (Platform.OS === "web") {
+      if (
+        typeof window !== "undefined" &&
+        window.confirm("Remover esta fotografia?")
+      ) {
+        proceed();
+      }
+      return;
+    }
+    Alert.alert(
+      "Remover fotografia",
+      "Esta ação não pode ser revertida.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Remover", style: "destructive", onPress: proceed },
+      ],
+      { cancelable: true },
+    );
+  };
+
   const handleDelete = () => {
     const proceed = async () => {
       await removeBreakdown(breakdown.id);
       router.back();
     };
     if (Platform.OS === "web") {
-      // eslint-disable-next-line no-alert
       if (
         typeof window !== "undefined" &&
         window.confirm("Eliminar este registo de avaria?")
@@ -220,9 +273,7 @@ export default function BreakdownDetailScreen() {
                     styles.consensusDot,
                     {
                       backgroundColor:
-                        i < count
-                          ? "#FFFFFF"
-                          : "rgba(255,255,255,0.18)",
+                        i < count ? "#FFFFFF" : "rgba(255,255,255,0.18)",
                     },
                   ]}
                 >
@@ -256,13 +307,10 @@ export default function BreakdownDetailScreen() {
             Reportado por
           </Text>
           <View style={styles.personRow}>
-            <View
-              style={[
-                styles.avatar,
-                { backgroundColor: colors.accent },
-              ]}
-            >
-              <Text style={[styles.avatarText, { color: colors.accentForeground }]}>
+            <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
+              <Text
+                style={[styles.avatarText, { color: colors.accentForeground }]}
+              >
                 {breakdown.reportedByName.charAt(0).toUpperCase()}
               </Text>
             </View>
@@ -278,6 +326,167 @@ export default function BreakdownDetailScreen() {
               </Text>
             </View>
           </View>
+        </View>
+
+        <View style={{ gap: 10 }}>
+          <View style={styles.photosHeader}>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[styles.sectionTitle, { color: colors.mutedForeground }]}
+              >
+                Fotografias
+              </Text>
+              <Text
+                style={[styles.photosHint, { color: colors.mutedForeground }]}
+              >
+                As fotos expiram após {BREAKDOWN_PHOTO_LIFETIME_DAYS} dias
+              </Text>
+            </View>
+            <Pressable
+              onPress={handleAddPhoto}
+              disabled={uploading}
+              style={({ pressed }) => [
+                styles.photoAddBtn,
+                {
+                  backgroundColor: colors.accent,
+                  borderRadius: colors.radius,
+                  opacity: pressed || uploading ? 0.8 : 1,
+                },
+              ]}
+            >
+              <Feather
+                name={uploading ? "loader" : "camera"}
+                size={16}
+                color={colors.accentForeground}
+              />
+              <Text
+                style={[
+                  styles.photoAddLabel,
+                  { color: colors.accentForeground },
+                ]}
+              >
+                {uploading ? "A carregar..." : "Adicionar"}
+              </Text>
+            </Pressable>
+          </View>
+
+          {photoFeedback ? (
+            <View
+              style={[
+                styles.feedback,
+                {
+                  backgroundColor: colors.muted,
+                  borderRadius: colors.radius,
+                },
+              ]}
+            >
+              <Feather
+                name="info"
+                size={14}
+                color={colors.mutedForeground}
+              />
+              <Text
+                style={[styles.feedbackText, { color: colors.foreground }]}
+              >
+                {photoFeedback}
+              </Text>
+            </View>
+          ) : null}
+
+          {breakdown.photos.length === 0 ? (
+            <View
+              style={[
+                styles.emptyPhotos,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  borderRadius: colors.radius,
+                },
+              ]}
+            >
+              <Feather
+                name="image"
+                size={20}
+                color={colors.mutedForeground}
+              />
+              <Text
+                style={[
+                  styles.emptyPhotosText,
+                  { color: colors.mutedForeground },
+                ]}
+              >
+                Sem fotos. Adiciona uma para mostrar a avaria.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.photoGrid}>
+              {breakdown.photos.map((p) => {
+                const remaining = daysUntilExpiry(
+                  p.addedAt,
+                  BREAKDOWN_PHOTO_LIFETIME_DAYS,
+                );
+                const canRemove =
+                  user?.id === p.addedById || isReporter;
+                return (
+                  <View
+                    key={p.id}
+                    style={[
+                      styles.photoTile,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                        borderRadius: colors.radius,
+                      },
+                    ]}
+                  >
+                    <Image
+                      source={{ uri: p.uri }}
+                      style={styles.photoImage}
+                      contentFit="cover"
+                    />
+                    <View style={styles.photoFoot}>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.photoBy,
+                            { color: colors.foreground },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {p.addedByName}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.photoExpiry,
+                            { color: colors.mutedForeground },
+                          ]}
+                        >
+                          Expira em {remaining} dia
+                          {remaining === 1 ? "" : "s"}
+                        </Text>
+                      </View>
+                      {canRemove ? (
+                        <Pressable
+                          onPress={() => handleRemovePhoto(p)}
+                          hitSlop={8}
+                          style={({ pressed }) => ({
+                            opacity: pressed ? 0.6 : 1,
+                            padding: 4,
+                          })}
+                        >
+                          <Feather
+                            name="trash-2"
+                            size={14}
+                            color={colors.destructive}
+                          />
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
 
         <View style={{ gap: 10 }}>
@@ -315,7 +524,11 @@ export default function BreakdownDetailScreen() {
           ) : (
             <View style={{ gap: 8 }}>
               {breakdown.confirmations.map((c, idx) => (
-                <ConfirmationRow key={c.crewMemberId} confirmation={c} index={idx + 1} />
+                <ConfirmationRow
+                  key={c.crewMemberId}
+                  confirmation={c}
+                  index={idx + 1}
+                />
               ))}
             </View>
           )}
@@ -333,10 +546,7 @@ export default function BreakdownDetailScreen() {
           >
             <Feather name="info" size={16} color={colors.mutedForeground} />
             <Text
-              style={[
-                styles.feedbackText,
-                { color: colors.foreground },
-              ]}
+              style={[styles.feedbackText, { color: colors.foreground }]}
             >
               {feedback}
             </Text>
@@ -382,7 +592,8 @@ export default function BreakdownDetailScreen() {
           >
             <Feather name="check" size={16} color={colors.success} />
             <Text style={[styles.noticeText, { color: colors.foreground }]}>
-              Já validaste esta reparação. Faltam {required - count} validações.
+              Já validaste esta reparação. Faltam {required - count}{" "}
+              validações.
             </Text>
           </View>
         ) : resolved ? (
@@ -395,11 +606,7 @@ export default function BreakdownDetailScreen() {
               },
             ]}
           >
-            <Feather
-              name="check-circle"
-              size={16}
-              color={colors.success}
-            />
+            <Feather name="check-circle" size={16} color={colors.success} />
             <Text style={[styles.noticeText, { color: colors.foreground }]}>
               Avaria resolvida por consenso da tripulação.
             </Text>
@@ -429,12 +636,7 @@ function ConfirmationRow({
         },
       ]}
     >
-      <View
-        style={[
-          styles.indexBadge,
-          { backgroundColor: colors.success },
-        ]}
-      >
+      <View style={[styles.indexBadge, { backgroundColor: colors.success }]}>
         <Text style={styles.indexBadgeText}>{index}</Text>
       </View>
       <View style={{ flex: 1 }}>
@@ -442,7 +644,8 @@ function ConfirmationRow({
           {confirmation.crewMemberName}
         </Text>
         <Text style={[styles.personMeta, { color: colors.mutedForeground }]}>
-          Tripulante #{confirmation.crewIdLabel} · {formatRelative(confirmation.at)}
+          Tripulante #{confirmation.crewIdLabel} ·{" "}
+          {formatRelative(confirmation.at)}
         </Text>
       </View>
       <Feather name="check" size={18} color={colors.success} />
@@ -576,6 +779,70 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     textTransform: "uppercase",
     letterSpacing: 0.8,
+  },
+  photosHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  photosHint: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    marginTop: 2,
+  },
+  photoAddBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  photoAddLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  emptyPhotos: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderWidth: 1,
+  },
+  emptyPhotosText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+  photoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  photoTile: {
+    width: "48%",
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  photoImage: {
+    width: "100%",
+    aspectRatio: 1,
+    backgroundColor: "#0001",
+  },
+  photoFoot: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  photoBy: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+  photoExpiry: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    marginTop: 1,
   },
   emptyConfirm: {
     flexDirection: "row",

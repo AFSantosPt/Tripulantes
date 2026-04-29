@@ -221,6 +221,17 @@ function BreakdownCard({
           <Text style={[styles.metaValue, { color: colors.foreground }]}>
             {breakdown.reportedByName}
           </Text>
+          {breakdown.photos.length > 0 ? (
+            <View style={styles.photoBadge}>
+              <Feather name="camera" size={11} color={colors.mutedForeground} />
+              <Text
+                style={[styles.photoBadgeText, { color: colors.mutedForeground }]}
+              >
+                {breakdown.photos.length} foto
+                {breakdown.photos.length === 1 ? "" : "s"}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <ConsensusBar
@@ -375,5 +386,15 @@ const styles = StyleSheet.create({
   consensusLabel: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
+  },
+  photoBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 4,
+  },
+  photoBadgeText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
   },
 });

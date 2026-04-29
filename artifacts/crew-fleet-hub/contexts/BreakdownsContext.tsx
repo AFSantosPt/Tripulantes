@@ -13,6 +13,10 @@ import { newId } from "@/utils/id";
 
 const STORAGE_KEY = "@crew-fleet-hub/breakdowns/v1";
 const REQUIRED_CONFIRMATIONS = 3;
+const PHOTO_LIFETIME_DAYS = 14;
+const PHOTO_LIFETIME_MS = PHOTO_LIFETIME_DAYS * 24 * 60 * 60 * 1000;
+
+export const BREAKDOWN_PHOTO_LIFETIME_DAYS = PHOTO_LIFETIME_DAYS;
 
 export type VehicleKind = "eletrico" | "autocarro";
 
@@ -28,6 +32,14 @@ export interface Confirmation {
   at: string;
 }
 
+export interface BreakdownPhoto {
+  id: string;
+  uri: string;
+  addedAt: string;
+  addedById: string;
+  addedByName: string;
+}
+
 export interface Breakdown {
   id: string;
   vehicleKind: VehicleKind;
@@ -38,6 +50,7 @@ export interface Breakdown {
   reportedByCrewId: string;
   reportedAt: string;
   confirmations: Confirmation[];
+  photos: BreakdownPhoto[];
 }
 
 export const REQUIRED_CONFIRMATIONS_COUNT = REQUIRED_CONFIRMATIONS;
@@ -55,11 +68,63 @@ interface BreakdownsState {
   }) => Promise<Breakdown>;
   confirmRepair: (id: string) => Promise<{ ok: boolean; reason?: string }>;
   removeBreakdown: (id: string) => Promise<void>;
+  addPhoto: (
+    breakdownId: string,
+    uri: string,
+  ) => Promise<{ ok: boolean; reason?: string }>;
+  removePhoto: (breakdownId: string, photoId: string) => Promise<void>;
 }
 
 const BreakdownsContext = createContext<BreakdownsState | null>(null);
 
-export function BreakdownsProvider({ children }: { children: React.ReactNode }) {
+function normalizeBreakdown(raw: any): Breakdown {
+  return {
+    id: raw?.id ?? newId(),
+    vehicleKind: raw?.vehicleKind ?? "autocarro",
+    fleetNumber: String(raw?.fleetNumber ?? ""),
+    description: String(raw?.description ?? ""),
+    reportedById: String(raw?.reportedById ?? ""),
+    reportedByName: String(raw?.reportedByName ?? ""),
+    reportedByCrewId: String(raw?.reportedByCrewId ?? ""),
+    reportedAt: raw?.reportedAt ?? new Date().toISOString(),
+    confirmations: Array.isArray(raw?.confirmations) ? raw.confirmations : [],
+    photos: Array.isArray(raw?.photos)
+      ? raw.photos.map((p: any) => ({
+          id: String(p?.id ?? newId()),
+          uri: String(p?.uri ?? ""),
+          addedAt: String(p?.addedAt ?? new Date().toISOString()),
+          addedById: String(p?.addedById ?? ""),
+          addedByName: String(p?.addedByName ?? ""),
+        }))
+      : [],
+  };
+}
+
+function pruneExpiredPhotos(items: Breakdown[]): {
+  next: Breakdown[];
+  changed: boolean;
+} {
+  const now = Date.now();
+  let changed = false;
+  const next = items.map((b) => {
+    if (!b.photos || b.photos.length === 0) return b;
+    const fresh = b.photos.filter(
+      (p) => now - new Date(p.addedAt).getTime() < PHOTO_LIFETIME_MS,
+    );
+    if (fresh.length !== b.photos.length) {
+      changed = true;
+      return { ...b, photos: fresh };
+    }
+    return b;
+  });
+  return { next, changed };
+}
+
+export function BreakdownsProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user } = useAuth();
   const [breakdowns, setBreakdowns] = useState<Breakdown[]>([]);
   const [isReady, setIsReady] = useState<boolean>(false);
@@ -68,7 +133,20 @@ export function BreakdownsProvider({ children }: { children: React.ReactNode }) 
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) setBreakdowns(JSON.parse(raw));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const normalized = parsed.map(normalizeBreakdown);
+            const { next, changed } = pruneExpiredPhotos(normalized);
+            setBreakdowns(next);
+            if (
+              changed ||
+              parsed.some((p: any, i: number) => !Array.isArray(p?.photos))
+            ) {
+              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+            }
+          }
+        }
       } catch (e) {
         console.warn("Breakdowns load error", e);
       } finally {
@@ -95,6 +173,7 @@ export function BreakdownsProvider({ children }: { children: React.ReactNode }) 
         reportedByCrewId: user.crewId,
         reportedAt: new Date().toISOString(),
         confirmations: [],
+        photos: [],
       };
       await persist([created, ...breakdowns]);
       return created;
@@ -148,6 +227,42 @@ export function BreakdownsProvider({ children }: { children: React.ReactNode }) 
     [breakdowns, persist],
   );
 
+  const addPhoto = useCallback<BreakdownsState["addPhoto"]>(
+    async (breakdownId, uri) => {
+      if (!user) return { ok: false, reason: "Sem sessão iniciada" };
+      if (!uri) return { ok: false, reason: "Imagem inválida" };
+      const target = breakdowns.find((b) => b.id === breakdownId);
+      if (!target) return { ok: false, reason: "Avaria não encontrada" };
+      const photo: BreakdownPhoto = {
+        id: newId(),
+        uri,
+        addedAt: new Date().toISOString(),
+        addedById: user.id,
+        addedByName: user.name,
+      };
+      const next = breakdowns.map((b) =>
+        b.id === breakdownId
+          ? { ...b, photos: [photo, ...b.photos] }
+          : b,
+      );
+      await persist(next);
+      return { ok: true };
+    },
+    [user, breakdowns, persist],
+  );
+
+  const removePhoto = useCallback(
+    async (breakdownId: string, photoId: string) => {
+      const next = breakdowns.map((b) =>
+        b.id === breakdownId
+          ? { ...b, photos: b.photos.filter((p) => p.id !== photoId) }
+          : b,
+      );
+      await persist(next);
+    },
+    [breakdowns, persist],
+  );
+
   const value = useMemo<BreakdownsState>(() => {
     const sorted = [...breakdowns].sort((a, b) =>
       a.reportedAt < b.reportedAt ? 1 : -1,
@@ -167,8 +282,18 @@ export function BreakdownsProvider({ children }: { children: React.ReactNode }) 
       reportBreakdown,
       confirmRepair,
       removeBreakdown,
+      addPhoto,
+      removePhoto,
     };
-  }, [breakdowns, isReady, reportBreakdown, confirmRepair, removeBreakdown]);
+  }, [
+    breakdowns,
+    isReady,
+    reportBreakdown,
+    confirmRepair,
+    removeBreakdown,
+    addPhoto,
+    removePhoto,
+  ]);
 
   return (
     <BreakdownsContext.Provider value={value}>

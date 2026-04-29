@@ -14,35 +14,96 @@ import {
   AffectationType,
   ShiftCalc,
   calcShiftMinutes,
+  formatMinutesToTime,
+  parseTimeToMinutes,
 } from "@/utils/time";
 
 const STORAGE_KEY = "@crew-fleet-hub/shifts/v1";
+
+export interface ShiftStop {
+  location: string;
+  time: string;
+}
 
 export interface Shift {
   id: string;
   crewMemberId: string;
   date: string;
-  startMinutes: number;
-  endMinutes: number;
+  code?: string;
+  vehicleCode?: string;
   affectation: AffectationType;
+  affectationLabel?: string;
+  stops: ShiftStop[];
   notes?: string;
   createdAt: string;
 }
 
-export interface ShiftWithCalc extends Shift, ShiftCalc {}
+export interface ShiftWithCalc extends Shift, ShiftCalc {
+  startMinutes: number;
+  endMinutes: number;
+}
 
 interface ShiftsState {
   shifts: ShiftWithCalc[];
   allShifts: ShiftWithCalc[];
   isReady: boolean;
-  addShift: (input: Omit<Shift, "id" | "createdAt" | "crewMemberId">) => Promise<void>;
+  addShift: (
+    input: Omit<Shift, "id" | "createdAt" | "crewMemberId">,
+  ) => Promise<void>;
   removeShift: (id: string) => Promise<void>;
 }
 
 const ShiftsContext = createContext<ShiftsState | null>(null);
 
+function migrateLoadedShift(raw: any): Shift {
+  if (raw && Array.isArray(raw.stops) && raw.stops.length >= 2) {
+    return {
+      id: raw.id,
+      crewMemberId: raw.crewMemberId,
+      date: raw.date,
+      code: raw.code ?? undefined,
+      vehicleCode: raw.vehicleCode ?? undefined,
+      affectation: raw.affectation ?? "normal",
+      affectationLabel: raw.affectationLabel ?? undefined,
+      stops: raw.stops.map((s: any) => ({
+        location: String(s.location ?? ""),
+        time: String(s.time ?? "00:00"),
+      })),
+      notes: raw.notes ?? undefined,
+      createdAt: raw.createdAt ?? new Date().toISOString(),
+    };
+  }
+  const sm = typeof raw?.startMinutes === "number" ? raw.startMinutes : 0;
+  const em = typeof raw?.endMinutes === "number" ? raw.endMinutes : sm;
+  return {
+    id: raw?.id ?? newId(),
+    crewMemberId: raw?.crewMemberId ?? "",
+    date: raw?.date ?? new Date().toISOString().slice(0, 10),
+    code: raw?.code ?? undefined,
+    vehicleCode: raw?.vehicleCode ?? undefined,
+    affectation: raw?.affectation ?? "normal",
+    affectationLabel: raw?.affectationLabel ?? undefined,
+    stops: [
+      { location: "", time: formatMinutesToTime(sm) },
+      { location: "", time: formatMinutesToTime(em) },
+    ],
+    notes: raw?.notes ?? undefined,
+    createdAt: raw?.createdAt ?? new Date().toISOString(),
+  };
+}
+
 function decorate(shift: Shift): ShiftWithCalc {
-  return { ...shift, ...calcShiftMinutes(shift.startMinutes, shift.endMinutes) };
+  const first = shift.stops[0];
+  const last = shift.stops[shift.stops.length - 1];
+  const startMin = parseTimeToMinutes(first?.time ?? "00:00") ?? 0;
+  const endMin = parseTimeToMinutes(last?.time ?? "00:00") ?? startMin;
+  const safeEnd = endMin >= startMin ? endMin : startMin;
+  return {
+    ...shift,
+    startMinutes: startMin,
+    endMinutes: safeEnd,
+    ...calcShiftMinutes(startMin, safeEnd),
+  };
 }
 
 export function ShiftsProvider({ children }: { children: React.ReactNode }) {
@@ -54,7 +115,22 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) setShifts(JSON.parse(raw));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const migrated = parsed.map(migrateLoadedShift);
+            setShifts(migrated);
+            const needsRewrite = migrated.some(
+              (m, i) => !Array.isArray(parsed[i]?.stops),
+            );
+            if (needsRewrite) {
+              await AsyncStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify(migrated),
+              );
+            }
+          }
+        }
       } catch (e) {
         console.warn("Shifts load error", e);
       } finally {

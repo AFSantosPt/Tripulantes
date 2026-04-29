@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { TextField } from "@/components/TextField";
-import { useShifts } from "@/contexts/ShiftsContext";
+import { useShifts, ShiftStop } from "@/contexts/ShiftsContext";
 import { useColors } from "@/hooks/useColors";
 import {
   AffectationType,
@@ -26,56 +26,114 @@ import {
   todayIso,
 } from "@/utils/time";
 
+interface DraftStop {
+  location: string;
+  time: string;
+}
+
 export default function NewShiftScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { addShift } = useShifts();
+  const params = useLocalSearchParams<{ date?: string }>();
+  const initialDate =
+    typeof params.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(params.date)
+      ? params.date
+      : todayIso();
 
-  const [date, setDate] = useState<string>(todayIso());
-  const [start, setStart] = useState<string>("");
-  const [end, setEnd] = useState<string>("");
+  const [date, setDate] = useState<string>(initialDate);
+  const [code, setCode] = useState<string>("");
+  const [vehicleCode, setVehicleCode] = useState<string>("");
   const [affectation, setAffectation] = useState<AffectationType>("normal");
+  const [affectationLabel, setAffectationLabel] = useState<string>("");
+  const [stops, setStops] = useState<DraftStop[]>([
+    { location: "", time: "" },
+    { location: "", time: "" },
+  ]);
   const [notes, setNotes] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errors, setErrors] = useState<{
     date?: string;
-    start?: string;
-    end?: string;
+    stops?: string;
+    stopsByIndex?: Record<number, { location?: string; time?: string }>;
   }>({});
 
-  const startMinutes = useMemo(() => parseTimeToMinutes(start), [start]);
-  const endMinutes = useMemo(() => parseTimeToMinutes(end), [end]);
+  const stopMinutes = useMemo(
+    () => stops.map((s) => parseTimeToMinutes(s.time)),
+    [stops],
+  );
+
   const preview = useMemo(() => {
-    if (startMinutes == null || endMinutes == null) return null;
-    if (endMinutes <= startMinutes) return null;
-    return calcShiftMinutes(startMinutes, endMinutes);
-  }, [startMinutes, endMinutes]);
+    const valid = stopMinutes.filter((n): n is number => n != null);
+    if (valid.length < 2) return null;
+    const start = valid[0];
+    const end = valid[valid.length - 1];
+    if (end < start) return null;
+    return calcShiftMinutes(start, end);
+  }, [stopMinutes]);
+
+  const updateStop = (idx: number, patch: Partial<DraftStop>) => {
+    setStops((prev) =>
+      prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)),
+    );
+  };
+
+  const addStop = () => {
+    setStops((prev) => [...prev, { location: "", time: "" }]);
+  };
+
+  const removeStop = (idx: number) => {
+    if (stops.length <= 2) return;
+    setStops((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   const handleSave = async () => {
-    const next: typeof errors = {};
+    const next: typeof errors = { stopsByIndex: {} };
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       next.date = "Formato AAAA-MM-DD";
     }
-    if (startMinutes == null) next.start = "Formato HH:MM (suporta 25:15)";
-    if (endMinutes == null) next.end = "Formato HH:MM (suporta 28:00)";
-    if (
-      startMinutes != null &&
-      endMinutes != null &&
-      endMinutes <= startMinutes
-    ) {
-      next.end = "Hora fim tem de ser maior";
+    let invalidStops = 0;
+    stops.forEach((s, i) => {
+      const fieldErrs: { location?: string; time?: string } = {};
+      if (!s.location.trim()) fieldErrs.location = "Local obrigatório";
+      const parsed = parseTimeToMinutes(s.time);
+      if (parsed == null) fieldErrs.time = "HH:MM";
+      if (Object.keys(fieldErrs).length > 0) {
+        next.stopsByIndex![i] = fieldErrs;
+        invalidStops++;
+      }
+    });
+    if (invalidStops === 0) {
+      const minutes = stops.map((s) => parseTimeToMinutes(s.time) ?? 0);
+      const first = minutes[0];
+      const last = minutes[minutes.length - 1];
+      if (last < first) {
+        next.stops = "A última hora tem de ser igual ou maior que a primeira";
+      }
     }
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    if (
+      next.date ||
+      next.stops ||
+      Object.keys(next.stopsByIndex ?? {}).length > 0
+    ) {
+      return;
+    }
 
     setSubmitting(true);
     try {
+      const cleanedStops: ShiftStop[] = stops.map((s) => ({
+        location: s.location.trim(),
+        time: s.time.trim(),
+      }));
       await addShift({
         date,
-        startMinutes: startMinutes!,
-        endMinutes: endMinutes!,
+        code: code.trim() || undefined,
+        vehicleCode: vehicleCode.trim() || undefined,
         affectation,
+        affectationLabel: affectationLabel.trim() || undefined,
+        stops: cleanedStops,
         notes: notes.trim() || undefined,
       });
       router.back();
@@ -133,38 +191,31 @@ export default function NewShiftScreen() {
               error={errors.date}
             />
 
-            <View style={styles.timesRow}>
+            <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <TextField
-                  label="Hora início"
-                  placeholder="08:00"
-                  value={start}
-                  onChangeText={setStart}
-                  keyboardType="numbers-and-punctuation"
-                  autoCapitalize="none"
+                  label="Serviço"
+                  placeholder="Ex: 0115, Ordens"
+                  value={code}
+                  onChangeText={setCode}
+                  autoCapitalize="characters"
                   autoCorrect={false}
-                  error={errors.start}
                 />
               </View>
               <View style={{ flex: 1 }}>
                 <TextField
-                  label="Hora fim"
-                  placeholder="25:15"
-                  value={end}
-                  onChangeText={setEnd}
-                  keyboardType="numbers-and-punctuation"
-                  autoCapitalize="none"
+                  label="Serviço de Viatura"
+                  placeholder="Ex: 15E/06"
+                  value={vehicleCode}
+                  onChangeText={setVehicleCode}
+                  autoCapitalize="characters"
                   autoCorrect={false}
-                  error={errors.end}
-                  hint={!errors.end ? "Suporta turnos > 24h" : undefined}
                 />
               </View>
             </View>
 
             <View style={{ gap: 8 }}>
-              <Text
-                style={[styles.label, { color: colors.foreground }]}
-              >
+              <Text style={[styles.label, { color: colors.foreground }]}>
                 Tipo de afetação
               </Text>
               <SegmentedControl<AffectationType>
@@ -176,6 +227,134 @@ export default function NewShiftScreen() {
                   { value: "extra2", label: "Extra 2" },
                 ]}
               />
+            </View>
+
+            <TextField
+              label="Detalhe da afetação (opcional)"
+              placeholder="Ex: Normal FO, Extra Normal - Tipo2"
+              value={affectationLabel}
+              onChangeText={setAffectationLabel}
+              autoCorrect={false}
+              hint="Se vazio, usa o tipo selecionado acima"
+            />
+
+            <View style={{ gap: 10 }}>
+              <View style={styles.stopsHeader}>
+                <Text style={[styles.label, { color: colors.foreground }]}>
+                  Paragens (local + hora)
+                </Text>
+                <Pressable
+                  onPress={addStop}
+                  style={({ pressed }) => [
+                    styles.addStopBtn,
+                    {
+                      backgroundColor: colors.muted,
+                      borderRadius: 999,
+                      opacity: pressed ? 0.8 : 1,
+                    },
+                  ]}
+                >
+                  <Feather
+                    name="plus"
+                    size={14}
+                    color={colors.foreground}
+                  />
+                  <Text
+                    style={[
+                      styles.addStopLabel,
+                      { color: colors.foreground },
+                    ]}
+                  >
+                    Adicionar
+                  </Text>
+                </Pressable>
+              </View>
+
+              {stops.map((stop, idx) => {
+                const errs = errors.stopsByIndex?.[idx];
+                const isFirst = idx === 0;
+                const isLast = idx === stops.length - 1;
+                const stopLabel = isFirst
+                  ? "Início"
+                  : isLast
+                    ? "Fim"
+                    : `Paragem ${idx}`;
+                return (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.stopCard,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                        borderRadius: colors.radius,
+                      },
+                    ]}
+                  >
+                    <View style={styles.stopCardHead}>
+                      <Text
+                        style={[
+                          styles.stopCardLabel,
+                          { color: colors.mutedForeground },
+                        ]}
+                      >
+                        {stopLabel}
+                      </Text>
+                      {stops.length > 2 ? (
+                        <Pressable
+                          onPress={() => removeStop(idx)}
+                          hitSlop={8}
+                          style={({ pressed }) => [
+                            { opacity: pressed ? 0.6 : 1 },
+                          ]}
+                        >
+                          <Feather
+                            name="trash-2"
+                            size={16}
+                            color={colors.destructive}
+                          />
+                        </Pressable>
+                      ) : null}
+                    </View>
+                    <View style={styles.row}>
+                      <View style={{ flex: 1.4 }}>
+                        <TextField
+                          label="Local"
+                          placeholder="Ex: Calvário"
+                          value={stop.location}
+                          onChangeText={(v) =>
+                            updateStop(idx, { location: v })
+                          }
+                          autoCorrect={false}
+                          error={errs?.location}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <TextField
+                          label="Hora"
+                          placeholder="14:04"
+                          value={stop.time}
+                          onChangeText={(v) => updateStop(idx, { time: v })}
+                          keyboardType="numbers-and-punctuation"
+                          autoCorrect={false}
+                          autoCapitalize="none"
+                          error={errs?.time}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+              {errors.stops ? (
+                <Text style={[styles.errorText, { color: colors.destructive }]}>
+                  {errors.stops}
+                </Text>
+              ) : null}
+              <Text
+                style={[styles.hintText, { color: colors.mutedForeground }]}
+              >
+                Suporta horas {">"} 24h (ex: 25:15)
+              </Text>
             </View>
 
             <TextField
@@ -276,7 +455,7 @@ export default function NewShiftScreen() {
                     { color: colors.mutedForeground },
                   ]}
                 >
-                  Preenche as horas para ver o cálculo
+                  Preenche as paragens para ver o cálculo
                 </Text>
               </View>
             )}
@@ -319,12 +498,52 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   form: { gap: 16 },
-  timesRow: { flexDirection: "row", gap: 12 },
+  row: { flexDirection: "row", gap: 12 },
   label: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     textTransform: "uppercase",
     letterSpacing: 0.6,
+  },
+  stopsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  addStopBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  addStopLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+  stopCard: {
+    borderWidth: 1,
+    padding: 12,
+    gap: 8,
+  },
+  stopCardHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  stopCardLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  hintText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+  errorText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
   },
   preview: {
     flexDirection: "row",
