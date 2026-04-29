@@ -1,0 +1,82 @@
+
+
+crew-fleet-hub
+
+Comprar
+
+
+
+Loading...
+​🏗️ Projeto: App de Gestão de Tripulantes e Frota
+
+​1. Módulo de Autenticação
+
+​Utilizadores: Sistema de login para Tripulantes.
+
+​Perfil: Cada tripulante tem um nome/ID associado (necessário para o histórico de avarias).
+
+​2. Módulo: Calendário de Serviços e Horas
+
+​Objetivo: Registo pessoal de turnos e cálculo de tempos.
+
+​Campos: * Data do Serviço.
+
+​Hora Início e Hora Fim (suporte para formato decimal/24h+, ex: 25:15).
+
+​Tipo de Afetação (Normal, Extra Tipo 1, Extra Tipo 2).
+
+​Lógica de Cálculo:
+
+​Conversão de horas para minutos totais para calcular a diferença entre entrada e saída.
+
+​Cálculo automático de horas normais (base 8h) e horas extras.
+
+​Nota: Este separador não contém o número da viatura.
+
+​3. Módulo: Gestão de Avarias (Sistema de Consenso)
+
+​Objetivo: Reportar e consultar o estado dos veículos (Elétricos e Autocarros).
+
+​Campos de Reporte: * Identificação: Número de Frota (ex: 550, 601) ou Matrícula.
+
+​Descrição do problema.
+
+​Nome de quem reportou (preenchido automaticamente via login).
+
+​Lógica de Resolução (Validada por Tripulantes):
+
+​A avaria não é fechada pela oficina, mas sim por consenso entre colegas.
+
+​Regra dos 3: São necessárias 3 confirmações de tripulantes diferentes para uma avaria ser considerada resolvida.
+
+​A app deve registar o nome de cada um dos 3 confirmadores.
+
+​Visualização:
+
+​Lista Ativa: Avarias pendentes ou com menos de 3 confirmações.
+
+​Histórico: Avarias que atingiram as 3 confirmações (consulta opcional).
+
+​Transparência: Todos os tripulantes podem ver quem reportou e quem já validou a reparação.
+
+​🚀 Instrução para a IA de Desenvolvimento:
+
+​"Age como um desenvolvedor Full Stack. Utiliza estas notas para criar a estrutura de base de dados (SQL ou NoSQL) e a lógica de backend. Prioriza a criação de uma interface mobile-friendly. A lógica de cálculo de horas deve tratar o tempo como minutos totais para permitir horários que ultrapassam as 24:00 (ex: 25:15)."
+
+​Precisas que eu detalhe mais algum destes pontos (como a estrutura exata das tabelas da base de dados) antes de passares para a outra IA?
+
+Apr 29, 12:32 PM
+
+
+
+View Preview
+
+
+Agent is waiting...
+Message Agent
+
+
+
+
+
+

@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "Crew Fleet Hub"
+version = "1.0.0"
+id = "artifacts/crew-fleet-hub"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 26148
+
+[services.development]
+run = "pnpm --filter @workspace/crew-fleet-hub run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/crew-fleet-hub", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/crew-fleet-hub", "run", "serve" ]
+
+[services.env]
+PORT = "26148"
+BASE_PATH = "/"
