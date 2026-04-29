@@ -145,6 +145,52 @@ export default function TeamScreen() {
                 />
               </Pressable>
             </View>
+            <Pressable
+              onPress={() => router.push("/change-password")}
+              style={({ pressed }) => [
+                styles.passwordRow,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  borderRadius: colors.radius,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+              testID="open-change-password"
+            >
+              <View
+                style={[
+                  styles.passwordIcon,
+                  { backgroundColor: colors.muted },
+                ]}
+              >
+                <Feather
+                  name="lock"
+                  size={16}
+                  color={colors.mutedForeground}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[styles.passwordTitle, { color: colors.foreground }]}
+                >
+                  Alterar password
+                </Text>
+                <Text
+                  style={[
+                    styles.passwordMeta,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  Atualiza a tua palavra-passe quando quiseres
+                </Text>
+              </View>
+              <Feather
+                name="chevron-right"
+                size={20}
+                color={colors.mutedForeground}
+              />
+            </Pressable>
             {!isAdmin ? (
               <View
                 style={[
@@ -516,6 +562,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
+  },
+  passwordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderWidth: 1,
+  },
+  passwordIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  passwordTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  passwordMeta: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    marginTop: 2,
   },
   infoCard: {
     flexDirection: "row",

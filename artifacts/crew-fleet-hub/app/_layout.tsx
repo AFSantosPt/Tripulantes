@@ -34,6 +34,13 @@ function RootLayoutNav() {
       <Stack.Screen name="login" options={{ animation: "fade" }} />
       <Stack.Screen name="register" options={{ animation: "slide_from_right" }} />
       <Stack.Screen
+        name="change-password"
+        options={{
+          presentation: "modal",
+          animation: "slide_from_bottom",
+        }}
+      />
+      <Stack.Screen
         name="shift-new"
         options={{
           presentation: "modal",

@@ -60,6 +60,10 @@ interface AuthState {
   rejectMember: (id: string) => Promise<void>;
   toggleAdmin: (id: string) => Promise<void>;
   removeMember: (id: string) => Promise<void>;
+  changePassword: (input: {
+    current: string;
+    next: string;
+  }) => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -253,6 +257,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [members, persistMembers, persistSession, user],
   );
 
+  const changePassword = useCallback<AuthState["changePassword"]>(
+    async ({ current, next }) => {
+      if (!user) return { ok: false, error: "Sessão inválida" };
+      if (!verifyPassword(current, user.passwordHash)) {
+        return { ok: false, error: "Password atual incorreta" };
+      }
+      if (next.length < 4) {
+        return {
+          ok: false,
+          error: "A nova password tem de ter pelo menos 4 caracteres",
+        };
+      }
+      if (current === next) {
+        return {
+          ok: false,
+          error: "A nova password tem de ser diferente da atual",
+        };
+      }
+      const updatedHash = hashPassword(next);
+      const nextMembers = members.map((m) =>
+        m.id === user.id ? { ...m, passwordHash: updatedHash } : m,
+      );
+      await persistMembers(nextMembers);
+      const updatedSelf = nextMembers.find((m) => m.id === user.id);
+      if (updatedSelf) await persistSession(updatedSelf);
+      return { ok: true };
+    },
+    [members, persistMembers, persistSession, user],
+  );
+
   const removeMember = useCallback(
     async (id: string) => {
       if (!user?.isAdmin) return;
@@ -288,6 +322,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       rejectMember,
       toggleAdmin,
       removeMember,
+      changePassword,
     };
   }, [
     user,
@@ -300,6 +335,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     rejectMember,
     toggleAdmin,
     removeMember,
+    changePassword,
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
