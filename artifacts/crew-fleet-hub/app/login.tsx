@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { EmptyState } from "@/components/EmptyState";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { TextField } from "@/components/TextField";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,32 +21,30 @@ export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signIn, roster, resumeAs } = useAuth();
-  const [name, setName] = useState<string>("");
+  const { signIn, isFirstSetup, pendingMembers } = useAuth();
   const [crewId, setCrewId] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   const handleSignIn = async () => {
     setError(null);
-    if (!name.trim()) {
-      setError("Indica o teu nome");
-      return;
-    }
-    if (!crewId.trim()) {
-      setError("Indica o teu número de tripulante");
-      return;
-    }
     setSubmitting(true);
     try {
-      await signIn(name, crewId);
+      const result = await signIn(crewId, password);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       router.replace("/");
-    } catch (e) {
+    } catch {
       setError("Não foi possível iniciar sessão");
     } finally {
       setSubmitting(false);
     }
   };
+
+  const goRegister = () => router.push("/register");
 
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? Math.max(insets.top, 67) : insets.top;
@@ -72,37 +69,78 @@ export default function LoginScreen() {
               { backgroundColor: colors.primary },
             ]}
           >
-            <Feather name="truck" size={26} color={colors.primaryForeground} />
+            <Feather name="users" size={26} color={colors.primaryForeground} />
           </View>
           <Text style={[styles.brand, { color: colors.foreground }]}>
-            Crew Fleet Hub
+            Tripulante
+          </Text>
+          <Text style={[styles.brandSub, { color: colors.mutedForeground }]}>
+            gestão
           </Text>
           <Text
             style={[styles.tagline, { color: colors.mutedForeground }]}
           >
-            Gestão de turnos e avarias para a tripulação. Entra com o teu nome
-            de serviço para começares.
+            Inicia sessão com o teu Nº Tripulante e a password que criaste.
           </Text>
+
+          {isFirstSetup ? (
+            <View
+              style={[
+                styles.banner,
+                {
+                  backgroundColor: colors.accent,
+                  borderRadius: colors.radius,
+                },
+              ]}
+            >
+              <Feather
+                name="shield"
+                size={18}
+                color={colors.accentForeground}
+              />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    styles.bannerTitle,
+                    { color: colors.accentForeground },
+                  ]}
+                >
+                  Primeira instalação
+                </Text>
+                <Text
+                  style={[
+                    styles.bannerText,
+                    { color: colors.accentForeground },
+                  ]}
+                >
+                  Ainda não há tripulantes registados. O primeiro a registar-se
+                  fica como administrador e poderá autorizar os colegas.
+                </Text>
+              </View>
+            </View>
+          ) : null}
 
           <View style={styles.form}>
             <TextField
-              label="Nome"
-              placeholder="Ex: João Silva"
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-              returnKeyType="next"
-              testID="login-name"
-            />
-            <TextField
               label="Nº Tripulante"
-              placeholder="Ex: 4218"
+              placeholder="Ex: 180123"
               value={crewId}
               onChangeText={setCrewId}
-              autoCapitalize="characters"
+              autoCapitalize="none"
+              keyboardType="number-pad"
+              returnKeyType="next"
+              testID="login-crew-id"
+            />
+            <TextField
+              label="Password"
+              placeholder="A tua password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
               returnKeyType="done"
               onSubmitEditing={handleSignIn}
-              testID="login-crew-id"
+              testID="login-password"
               error={error}
             />
             <PrimaryButton
@@ -114,80 +152,68 @@ export default function LoginScreen() {
             />
           </View>
 
-          {roster.length > 0 ? (
-            <View style={styles.section}>
-              <Text
-                style={[styles.sectionTitle, { color: colors.mutedForeground }]}
-              >
-                Tripulantes recentes
-              </Text>
-              <View style={{ gap: 8 }}>
-                {roster.slice(0, 6).map((m) => (
-                  <Pressable
-                    key={m.id}
-                    onPress={() => resumeAs(m).then(() => router.replace("/"))}
-                    style={({ pressed }) => [
-                      styles.recent,
-                      {
-                        backgroundColor: colors.card,
-                        borderColor: colors.border,
-                        borderRadius: colors.radius,
-                        opacity: pressed ? 0.85 : 1,
-                      },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.avatar,
-                        { backgroundColor: colors.accent },
-                      ]}
-                    >
-                      <Text
-                        style={{
-                          color: colors.accentForeground,
-                          fontFamily: "Inter_700Bold",
-                          fontSize: 16,
-                        }}
-                      >
-                        {m.name.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[
-                          styles.recentName,
-                          { color: colors.foreground },
-                        ]}
-                      >
-                        {m.name}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.recentMeta,
-                          { color: colors.mutedForeground },
-                        ]}
-                      >
-                        Tripulante #{m.crewId}
-                      </Text>
-                    </View>
-                    <Feather
-                      name="chevron-right"
-                      size={20}
-                      color={colors.mutedForeground}
-                    />
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ) : (
-            <View style={styles.section}>
-              <EmptyState
-                icon="users"
-                title="Primeiro acesso"
-                description="Os tripulantes que iniciem sessão aparecem aqui para entrada rápida."
+          <Pressable
+            onPress={goRegister}
+            style={({ pressed }) => [
+              styles.registerLink,
+              {
+                borderColor: colors.border,
+                borderRadius: colors.radius,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+            testID="login-register"
+          >
+            <View
+              style={[
+                styles.registerIcon,
+                { backgroundColor: colors.primary },
+              ]}
+            >
+              <Feather
+                name="user-plus"
+                size={18}
+                color={colors.primaryForeground}
               />
             </View>
-          )}
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[
+                  styles.registerTitle,
+                  { color: colors.foreground },
+                ]}
+              >
+                {isFirstSetup
+                  ? "Criar conta de administrador"
+                  : "Pedir acesso"}
+              </Text>
+              <Text
+                style={[
+                  styles.registerMeta,
+                  { color: colors.mutedForeground },
+                ]}
+              >
+                {isFirstSetup
+                  ? "Cria a primeira conta para começar"
+                  : "Um tripulante autorizado terá de aprovar"}
+              </Text>
+            </View>
+            <Feather
+              name="chevron-right"
+              size={20}
+              color={colors.mutedForeground}
+            />
+          </Pressable>
+
+          {!isFirstSetup && pendingMembers.length > 0 ? (
+            <Text
+              style={[styles.footnote, { color: colors.mutedForeground }]}
+            >
+              {pendingMembers.length === 1
+                ? "1 pedido de acesso à espera de aprovação."
+                : `${pendingMembers.length} pedidos de acesso à espera de aprovação.`}
+            </Text>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -210,47 +236,69 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   brand: {
-    fontSize: 30,
+    fontSize: 32,
     fontFamily: "Inter_700Bold",
     letterSpacing: -0.8,
+  },
+  brandSub: {
+    fontSize: 18,
+    fontFamily: "Inter_500Medium",
+    letterSpacing: -0.2,
+    marginTop: -2,
   },
   tagline: {
     fontSize: 15,
     fontFamily: "Inter_400Regular",
     lineHeight: 22,
-    marginTop: 4,
-    marginBottom: 24,
+    marginTop: 12,
+    marginBottom: 20,
     maxWidth: 360,
   },
-  form: { gap: 14 },
-  section: { marginTop: 28, gap: 12 },
-  sectionTitle: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+  banner: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+    marginBottom: 20,
   },
-  recent: {
+  bannerTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    marginBottom: 2,
+  },
+  bannerText: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
+  },
+  form: { gap: 14 },
+  registerLink: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 12,
+    padding: 14,
     borderWidth: 1,
+    marginTop: 24,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 999,
+  registerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  recentName: {
+  registerTitle: {
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
   },
-  recentMeta: {
+  registerMeta: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
     marginTop: 2,
+  },
+  footnote: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    marginTop: 16,
+    textAlign: "center",
   },
 });

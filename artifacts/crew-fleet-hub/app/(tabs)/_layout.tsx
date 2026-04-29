@@ -31,6 +31,10 @@ function NativeTabLayout() {
         />
         <Label>Avarias</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="team">
+        <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
+        <Label>Equipa</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
@@ -102,6 +106,18 @@ function ClassicTabLayout() {
               />
             ) : (
               <Feather name="tool" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="team"
+        options={{
+          title: "Equipa",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="person.2" tintColor={color} size={24} />
+            ) : (
+              <Feather name="users" size={22} color={color} />
             ),
         }}
       />

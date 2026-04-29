@@ -32,6 +32,7 @@ function RootLayoutNav() {
     >
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="login" options={{ animation: "fade" }} />
+      <Stack.Screen name="register" options={{ animation: "slide_from_right" }} />
       <Stack.Screen
         name="shift-new"
         options={{
