@@ -8,17 +8,9 @@ import React, {
   useState,
 } from "react";
 
-import { hashPassword, verifyPassword } from "@/utils/hash";
-import { newId } from "@/utils/id";
+import { apiFetch } from "@/utils/apiClient";
 
 const SESSION_KEY = "@tripulante-gestao/session/v2";
-const MEMBERS_KEY = "@tripulante-gestao/members/v2";
-
-const DEFAULT_ADMIN = {
-  name: "André Santos",
-  crewId: "180939",
-  password: "andres91",
-};
 
 export type AccountStatus = "pending" | "active";
 
@@ -40,7 +32,6 @@ export interface CrewMember {
   id: string;
   name: string;
   crewId: string;
-  passwordHash: string;
   status: AccountStatus;
   isAdmin: boolean;
   categories: CrewCategory[];
@@ -84,120 +75,117 @@ interface AuthState {
     current: string;
     next: string;
   }) => Promise<{ ok: true } | { ok: false; error: string }>;
+  refreshMembers: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
 
-function normalizeCrewId(crewId: string): string {
-  return crewId.trim().toLowerCase();
-}
-
-function normalizeMember(raw: any): CrewMember {
-  return {
-    id: String(raw?.id ?? ""),
-    name: String(raw?.name ?? ""),
-    crewId: String(raw?.crewId ?? ""),
-    passwordHash: String(raw?.passwordHash ?? ""),
-    status: raw?.status === "active" ? "active" : "pending",
-    isAdmin: Boolean(raw?.isAdmin),
-    categories: Array.isArray(raw?.categories)
-      ? (raw.categories as string[]).filter((c): c is CrewCategory =>
-          ALL_CREW_CATEGORIES.includes(c as CrewCategory),
-        )
-      : [],
-    createdAt: raw?.createdAt ?? new Date().toISOString(),
-    approvedAt: raw?.approvedAt,
-    approvedById: raw?.approvedById,
-  };
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [members, setMembers] = useState<CrewMember[]>([]);
   const [user, setUser] = useState<CrewMember | null>(null);
+  const [members, setMembers] = useState<CrewMember[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [isReady, setIsReady] = useState<boolean>(false);
+  const [isFirstSetup, setIsFirstSetup] = useState<boolean>(false);
+
+  const fetchMembers = useCallback(async (adminId: string) => {
+    try {
+      const res = await apiFetch("/api/auth/members", { memberId: adminId });
+      if (res.ok) {
+        const data = await res.json();
+        setMembers(data.members as CrewMember[]);
+      }
+    } catch {
+    }
+  }, []);
+
+  const fetchMe = useCallback(async (id: string): Promise<CrewMember | null> => {
+    try {
+      const res = await apiFetch("/api/auth/me", { memberId: id });
+      if (res.ok) {
+        const data = await res.json();
+        return data.member as CrewMember;
+      }
+    } catch {
+    }
+    return null;
+  }, []);
 
   useEffect(() => {
     (async () => {
       try {
-        const [rawMembers, rawSession] = await Promise.all([
-          AsyncStorage.getItem(MEMBERS_KEY),
-          AsyncStorage.getItem(SESSION_KEY),
-        ]);
-        let loadedMembers: CrewMember[] = rawMembers
-          ? (JSON.parse(rawMembers) as any[]).map(normalizeMember)
-          : [];
-        if (loadedMembers.length === 0) {
-          const seed: CrewMember = {
-            id: newId(),
-            name: DEFAULT_ADMIN.name,
-            crewId: DEFAULT_ADMIN.crewId,
-            passwordHash: hashPassword(DEFAULT_ADMIN.password),
-            status: "active",
-            isAdmin: true,
-            categories: ["motorista"],
-            createdAt: new Date().toISOString(),
-            approvedAt: new Date().toISOString(),
-          };
-          loadedMembers = [seed];
-          await AsyncStorage.setItem(
-            MEMBERS_KEY,
-            JSON.stringify(loadedMembers),
-          );
-        }
-        setMembers(loadedMembers);
+        const rawSession = await AsyncStorage.getItem(SESSION_KEY);
         if (rawSession) {
-          const sessionId: string = JSON.parse(rawSession);
-          const found = loadedMembers.find(
-            (m) => m.id === sessionId && m.status === "active",
-          );
-          if (found) setUser(found);
+          const id: string = JSON.parse(rawSession);
+          const me = await fetchMe(id);
+          if (me) {
+            setUser(me);
+            setSessionId(id);
+            if (me.isAdmin) {
+              await fetchMembers(id);
+            }
+          } else {
+            await AsyncStorage.removeItem(SESSION_KEY);
+            const statusRes = await apiFetch("/api/auth/status");
+            if (statusRes.ok) {
+              const { hasAdmin } = await statusRes.json();
+              setIsFirstSetup(!hasAdmin);
+            }
+          }
+        } else {
+          const statusRes = await apiFetch("/api/auth/status");
+          if (statusRes.ok) {
+            const { hasAdmin } = await statusRes.json();
+            setIsFirstSetup(!hasAdmin);
+          }
         }
-      } catch (e) {
-        console.warn("Auth load error", e);
+      } catch {
       } finally {
         setIsReady(true);
       }
     })();
-  }, []);
+  }, [fetchMe, fetchMembers]);
 
-  const persistMembers = useCallback(async (next: CrewMember[]) => {
-    setMembers(next);
-    await AsyncStorage.setItem(MEMBERS_KEY, JSON.stringify(next));
-  }, []);
+  const persistSession = useCallback(
+    async (member: CrewMember | null) => {
+      setUser(member);
+      if (member) {
+        setSessionId(member.id);
+        await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(member.id));
+      } else {
+        setSessionId(null);
+        setMembers([]);
+        await AsyncStorage.removeItem(SESSION_KEY);
+      }
+    },
+    [],
+  );
 
-  const persistSession = useCallback(async (member: CrewMember | null) => {
-    setUser(member);
-    if (member) {
-      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(member.id));
-    } else {
-      await AsyncStorage.removeItem(SESSION_KEY);
-    }
-  }, []);
+  const refreshMembers = useCallback(async () => {
+    const id = sessionId ?? user?.id;
+    if (!id || !user?.isAdmin) return;
+    await fetchMembers(id);
+  }, [sessionId, user, fetchMembers]);
 
   const signIn = useCallback<AuthState["signIn"]>(
     async (crewId, password) => {
-      const id = normalizeCrewId(crewId);
-      if (!id) return { ok: false, error: "Indica o teu Nº Tripulante" };
+      if (!crewId.trim()) return { ok: false, error: "Indica o teu Nº Tripulante" };
       if (!password) return { ok: false, error: "Indica a tua password" };
-      const found = members.find(
-        (m) => normalizeCrewId(m.crewId) === id,
-      );
-      if (!found) {
-        return { ok: false, error: "Nº Tripulante não encontrado" };
+      try {
+        const res = await apiFetch("/api/auth/signin", {
+          method: "POST",
+          body: JSON.stringify({ crewId, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, error: data.error ?? "Erro ao entrar" };
+        const member = data.member as CrewMember;
+        await persistSession(member);
+        if (member.isAdmin) await fetchMembers(member.id);
+        return { ok: true, member };
+      } catch {
+        return { ok: false, error: "Sem ligação ao servidor" };
       }
-      if (!verifyPassword(password, found.passwordHash)) {
-        return { ok: false, error: "Password incorreta" };
-      }
-      if (found.status === "pending") {
-        return {
-          ok: false,
-          error: "Conta ainda não aprovada por um tripulante autorizado",
-        };
-      }
-      await persistSession(found);
-      return { ok: true, member: found };
     },
-    [members, persistSession],
+    [persistSession, fetchMembers],
   );
 
   const signOut = useCallback(async () => {
@@ -206,166 +194,134 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const registerRequest = useCallback<AuthState["registerRequest"]>(
     async ({ name, crewId, password, categories }) => {
-      const trimmedName = name.trim();
-      const trimmedCrewId = crewId.trim();
-      if (!trimmedName) return { ok: false, error: "Indica o teu nome" };
-      if (!trimmedCrewId)
-        return { ok: false, error: "Indica o teu Nº Tripulante" };
-      if (password.length < 4)
-        return { ok: false, error: "Password tem de ter pelo menos 4 caracteres" };
-      if (categories.length === 0)
-        return { ok: false, error: "Seleciona pelo menos uma categoria" };
-
-      const idLower = normalizeCrewId(trimmedCrewId);
-      const existing = members.find(
-        (m) => normalizeCrewId(m.crewId) === idLower,
-      );
-      if (existing) {
-        return { ok: false, error: "Já existe um pedido com este Nº Tripulante" };
+      try {
+        const res = await apiFetch("/api/auth/register", {
+          method: "POST",
+          body: JSON.stringify({ name, crewId, password, categories }),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, error: data.error ?? "Erro ao registar" };
+        const member = data.member as CrewMember;
+        if (data.autoActivated) {
+          await persistSession(member);
+        }
+        return { ok: true, autoActivated: data.autoActivated, member };
+      } catch {
+        return { ok: false, error: "Sem ligação ao servidor" };
       }
-
-      const hasActiveAdmin = members.some(
-        (m) => m.status === "active" && m.isAdmin,
-      );
-      const autoActivated = !hasActiveAdmin;
-
-      const created: CrewMember = {
-        id: newId(),
-        name: trimmedName,
-        crewId: trimmedCrewId,
-        passwordHash: hashPassword(password),
-        status: autoActivated ? "active" : "pending",
-        isAdmin: autoActivated,
-        categories,
-        createdAt: new Date().toISOString(),
-        approvedAt: autoActivated ? new Date().toISOString() : undefined,
-      };
-
-      await persistMembers([...members, created]);
-      if (autoActivated) {
-        await persistSession(created);
-      }
-      return { ok: true, autoActivated, member: created };
     },
-    [members, persistMembers, persistSession],
+    [persistSession],
   );
 
   const approveMember = useCallback(
     async (id: string) => {
       if (!user?.isAdmin) return;
-      const next = members.map((m) =>
-        m.id === id
-          ? {
-              ...m,
-              status: "active" as const,
-              approvedAt: new Date().toISOString(),
-              approvedById: user.id,
-            }
-          : m,
-      );
-      await persistMembers(next);
+      try {
+        const res = await apiFetch(`/api/auth/members/${id}/approve`, {
+          method: "POST",
+          memberId: user.id,
+        });
+        if (res.ok) await fetchMembers(user.id);
+      } catch {
+      }
     },
-    [members, persistMembers, user],
+    [user, fetchMembers],
   );
 
   const rejectMember = useCallback(
     async (id: string) => {
       if (!user?.isAdmin) return;
-      const next = members.filter((m) => m.id !== id);
-      await persistMembers(next);
+      try {
+        await apiFetch(`/api/auth/members/${id}`, {
+          method: "DELETE",
+          memberId: user.id,
+        });
+        await fetchMembers(user.id);
+      } catch {
+      }
     },
-    [members, persistMembers, user],
+    [user, fetchMembers],
   );
 
   const toggleAdmin = useCallback(
     async (id: string) => {
       if (!user?.isAdmin) return;
-      const target = members.find((m) => m.id === id);
-      if (!target || target.status !== "active") return;
-      const remainingAdmins = members.filter(
-        (m) => m.status === "active" && m.isAdmin && m.id !== id,
-      ).length;
-      if (target.isAdmin && remainingAdmins === 0) {
-        return;
-      }
-      const next = members.map((m) =>
-        m.id === id ? { ...m, isAdmin: !m.isAdmin } : m,
-      );
-      await persistMembers(next);
-      if (id === user.id) {
-        const updated = next.find((m) => m.id === id);
-        if (updated) await persistSession(updated);
+      try {
+        const res = await apiFetch(`/api/auth/members/${id}/toggle-admin`, {
+          method: "POST",
+          memberId: user.id,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const updated = data.member as CrewMember;
+          await fetchMembers(user.id);
+          if (id === user.id) setUser(updated);
+        }
+      } catch {
       }
     },
-    [members, persistMembers, persistSession, user],
-  );
-
-  const updateCategories = useCallback(
-    async (memberId: string, categories: CrewCategory[]) => {
-      if (!user?.isAdmin) return;
-      const next = members.map((m) =>
-        m.id === memberId ? { ...m, categories } : m,
-      );
-      await persistMembers(next);
-      if (memberId === user.id) {
-        const updated = next.find((m) => m.id === memberId);
-        if (updated) await persistSession(updated);
-      }
-    },
-    [members, persistMembers, persistSession, user],
-  );
-
-  const changePassword = useCallback<AuthState["changePassword"]>(
-    async ({ current, next }) => {
-      if (!user) return { ok: false, error: "Sessão inválida" };
-      if (!verifyPassword(current, user.passwordHash)) {
-        return { ok: false, error: "Password atual incorreta" };
-      }
-      if (next.length < 4) {
-        return {
-          ok: false,
-          error: "A nova password tem de ter pelo menos 4 caracteres",
-        };
-      }
-      if (current === next) {
-        return {
-          ok: false,
-          error: "A nova password tem de ser diferente da atual",
-        };
-      }
-      const updatedHash = hashPassword(next);
-      const nextMembers = members.map((m) =>
-        m.id === user.id ? { ...m, passwordHash: updatedHash } : m,
-      );
-      await persistMembers(nextMembers);
-      const updatedSelf = nextMembers.find((m) => m.id === user.id);
-      if (updatedSelf) await persistSession(updatedSelf);
-      return { ok: true };
-    },
-    [members, persistMembers, persistSession, user],
+    [user, fetchMembers],
   );
 
   const removeMember = useCallback(
     async (id: string) => {
-      if (!user?.isAdmin) return;
-      if (id === user.id) return;
-      const target = members.find((m) => m.id === id);
-      if (!target) return;
-      if (target.isAdmin) {
-        const remainingAdmins = members.filter(
-          (m) => m.status === "active" && m.isAdmin && m.id !== id,
-        ).length;
-        if (remainingAdmins === 0) return;
+      if (!user?.isAdmin || id === user.id) return;
+      try {
+        await apiFetch(`/api/auth/members/${id}`, {
+          method: "DELETE",
+          memberId: user.id,
+        });
+        await fetchMembers(user.id);
+      } catch {
       }
-      await persistMembers(members.filter((m) => m.id !== id));
     },
-    [members, persistMembers, user],
+    [user, fetchMembers],
+  );
+
+  const updateCategories = useCallback(
+    async (memberId: string, categories: CrewCategory[]) => {
+      if (!user) return;
+      try {
+        const res = await apiFetch(`/api/auth/members/${memberId}/categories`, {
+          method: "POST",
+          memberId: user.id,
+          body: JSON.stringify({ categories }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const updated = data.member as CrewMember;
+          if (memberId === user.id) setUser(updated);
+          if (user.isAdmin) await fetchMembers(user.id);
+        }
+      } catch {
+      }
+    },
+    [user, fetchMembers],
+  );
+
+  const changePassword = useCallback<AuthState["changePassword"]>(
+    async ({ current, next: nextPassword }) => {
+      if (!user) return { ok: false, error: "Sessão inválida" };
+      try {
+        const res = await apiFetch("/api/auth/change-password", {
+          method: "POST",
+          memberId: user.id,
+          body: JSON.stringify({ current, next: nextPassword }),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, error: data.error ?? "Erro" };
+        setUser(data.member as CrewMember);
+        return { ok: true };
+      } catch {
+        return { ok: false, error: "Sem ligação ao servidor" };
+      }
+    },
+    [user],
   );
 
   const value = useMemo<AuthState>(() => {
     const pending = members.filter((m) => m.status === "pending");
     const active = members.filter((m) => m.status === "active");
-    const isFirstSetup = !active.some((m) => m.isAdmin);
     return {
       user,
       members,
@@ -382,11 +338,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       removeMember,
       updateCategories,
       changePassword,
+      refreshMembers,
     };
   }, [
     user,
     members,
     isReady,
+    isFirstSetup,
     signIn,
     signOut,
     registerRequest,
@@ -396,6 +354,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     removeMember,
     updateCategories,
     changePassword,
+    refreshMembers,
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

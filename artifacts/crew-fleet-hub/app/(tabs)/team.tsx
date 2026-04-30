@@ -1,11 +1,12 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
   Platform,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -40,7 +41,24 @@ export default function TeamScreen() {
     toggleAdmin,
     removeMember,
     signOut,
+    refreshMembers,
   } = useAuth();
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (!user?.isAdmin) return;
+    const interval = setInterval(() => {
+      refreshMembers();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [user?.isAdmin, refreshMembers]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshMembers();
+    setRefreshing(false);
+  };
 
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? Math.max(insets.top, 67) : insets.top;
@@ -100,6 +118,16 @@ export default function TeamScreen() {
       <FlatList<Section>
         data={sections}
         keyExtractor={(s) => s.key}
+        refreshControl={
+          user?.isAdmin ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          ) : undefined
+        }
         contentContainerStyle={{
           paddingTop: topPad + 8,
           paddingBottom: bottomTab + 24,
