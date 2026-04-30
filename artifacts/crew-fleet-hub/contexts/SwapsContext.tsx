@@ -9,7 +9,7 @@ import React, {
 } from "react";
 
 import { CrewCategory, useAuth } from "@/contexts/AuthContext";
-import { ShiftWithCalc } from "@/contexts/ShiftsContext";
+import { ShiftStop, ShiftWithCalc } from "@/contexts/ShiftsContext";
 import { newId } from "@/utils/id";
 import { todayIso } from "@/utils/time";
 
@@ -28,6 +28,7 @@ export interface SwapRequest {
   offerShiftCode?: string;
   offerShiftStart: string;
   offerShiftEnd: string;
+  offerShiftStops: ShiftStop[];
   offerShiftVehicle?: string;
   requesterId: string;
   requesterName: string;
@@ -68,6 +69,12 @@ function normalizeSwapRequest(raw: any): SwapRequest {
     offerShiftCode: raw?.offerShiftCode ?? undefined,
     offerShiftStart: String(raw?.offerShiftStart ?? ""),
     offerShiftEnd: String(raw?.offerShiftEnd ?? ""),
+    offerShiftStops: Array.isArray(raw?.offerShiftStops)
+      ? raw.offerShiftStops.map((s: any) => ({
+          location: String(s?.location ?? ""),
+          time: String(s?.time ?? ""),
+        }))
+      : [],
     offerShiftVehicle: raw?.offerShiftVehicle ?? undefined,
     requesterId: String(raw?.requesterId ?? ""),
     requesterName: String(raw?.requesterName ?? ""),
@@ -151,6 +158,7 @@ export function SwapsProvider({ children }: { children: React.ReactNode }) {
         offerShiftCode: shift.code,
         offerShiftStart: shift.stops[0]?.time ?? "00:00",
         offerShiftEnd: shift.stops[shift.stops.length - 1]?.time ?? "00:00",
+        offerShiftStops: shift.stops,
         offerShiftVehicle: shift.vehicleCode,
         requesterId: user.id,
         requesterName: user.name,

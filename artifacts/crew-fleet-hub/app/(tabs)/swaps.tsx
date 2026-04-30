@@ -16,7 +16,7 @@ import {
   CrewCategory,
   useAuth,
 } from "@/contexts/AuthContext";
-import { ShiftWithCalc, useShifts } from "@/contexts/ShiftsContext";
+import { ShiftStop, ShiftWithCalc, useShifts } from "@/contexts/ShiftsContext";
 import { SwapRequest, useSwaps } from "@/contexts/SwapsContext";
 import { useColors } from "@/hooks/useColors";
 import { formatDateShort, todayIso } from "@/utils/time";
@@ -89,6 +89,73 @@ function CategoryChips({ categories }: { categories: CrewCategory[] }) {
   );
 }
 
+function StopsList({ stops }: { stops: ShiftStop[] }) {
+  const colors = useColors();
+  if (!stops.length) return null;
+  return (
+    <View style={styles.stopsList}>
+      {stops.map((stop, i) => {
+        const isFirst = i === 0;
+        const isLast = i === stops.length - 1;
+        return (
+          <View key={i} style={styles.stopRow}>
+            <View style={styles.stopIndicator}>
+              <View
+                style={[
+                  styles.stopDot,
+                  {
+                    backgroundColor:
+                      isFirst || isLast ? colors.primary : colors.border,
+                    borderColor: colors.primary,
+                  },
+                ]}
+              />
+              {!isLast && (
+                <View
+                  style={[styles.stopLine, { backgroundColor: colors.border }]}
+                />
+              )}
+            </View>
+            <View style={styles.stopContent}>
+              <Text
+                style={[
+                  styles.stopLocation,
+                  {
+                    color:
+                      isFirst || isLast
+                        ? colors.foreground
+                        : colors.mutedForeground,
+                    fontFamily:
+                      isFirst || isLast
+                        ? "Inter_600SemiBold"
+                        : "Inter_400Regular",
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {stop.location || "—"}
+              </Text>
+            </View>
+            <Text
+              style={[
+                styles.stopTime,
+                {
+                  color:
+                    isFirst || isLast ? colors.primary : colors.mutedForeground,
+                  fontFamily:
+                    isFirst || isLast ? "Inter_600SemiBold" : "Inter_400Regular",
+                },
+              ]}
+            >
+              {stop.time}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function SectionHeader({ title, count }: { title: string; count?: number }) {
   const colors = useColors();
   return (
@@ -145,8 +212,6 @@ function AvailableShiftCard({
   onRequest: () => void;
 }) {
   const colors = useColors();
-  const start = shift.stops[0]?.time ?? "—";
-  const end = shift.stops[shift.stops.length - 1]?.time ?? "—";
 
   const handlePress = () => {
     const msg = `Pedir troca do serviço${shift.code ? ` ${shift.code}` : ""} de ${offererName} (${formatDateShort(shift.date)})?`;
@@ -193,42 +258,32 @@ function AvailableShiftCard({
       <View
         style={[styles.cardDivider, { backgroundColor: colors.border }]}
       />
-      <View style={styles.shiftRow}>
-        <View style={styles.shiftMeta}>
-          <Text style={[styles.shiftDate, { color: colors.primary }]}>
-            {formatDateShort(shift.date)}
-          </Text>
-          {shift.code ? (
-            <View
-              style={[
-                styles.codeTag,
-                { backgroundColor: colors.muted, borderRadius: 6 },
-              ]}
-            >
-              <Text
-                style={[styles.codeTagText, { color: colors.foreground }]}
-              >
-                {shift.code}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-        <Text
-          style={[styles.shiftTime, { color: colors.mutedForeground }]}
-        >
-          {start} → {end}
+      <View style={styles.shiftHeaderRow}>
+        <Text style={[styles.shiftDate, { color: colors.primary }]}>
+          {formatDateShort(shift.date)}
         </Text>
-      </View>
-      {shift.vehicleCode ? (
-        <View style={styles.vehicleRow}>
-          <Feather name="truck" size={12} color={colors.mutedForeground} />
-          <Text
-            style={[styles.vehicleText, { color: colors.mutedForeground }]}
+        {shift.code ? (
+          <View
+            style={[
+              styles.codeTag,
+              { backgroundColor: colors.muted, borderRadius: 6 },
+            ]}
           >
-            {shift.vehicleCode}
-          </Text>
-        </View>
-      ) : null}
+            <Text style={[styles.codeTagText, { color: colors.foreground }]}>
+              {shift.code}
+            </Text>
+          </View>
+        ) : null}
+        {shift.vehicleCode ? (
+          <View style={styles.vehicleInline}>
+            <Feather name="truck" size={11} color={colors.mutedForeground} />
+            <Text style={[styles.vehicleText, { color: colors.mutedForeground }]}>
+              {shift.vehicleCode}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+      <StopsList stops={shift.stops} />
       <Pressable
         onPress={handlePress}
         style={({ pressed }) => [
@@ -328,32 +383,40 @@ function SentRequestCard({
       <View
         style={[styles.cardDivider, { backgroundColor: colors.border }]}
       />
-      <View style={styles.shiftRow}>
-        <View style={styles.shiftMeta}>
-          <Text style={[styles.shiftDate, { color: colors.primary }]}>
-            {formatDateShort(req.offerShiftDate)}
-          </Text>
-          {req.offerShiftCode ? (
-            <View
-              style={[
-                styles.codeTag,
-                { backgroundColor: colors.muted, borderRadius: 6 },
-              ]}
-            >
-              <Text
-                style={[styles.codeTagText, { color: colors.foreground }]}
-              >
-                {req.offerShiftCode}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-        <Text
-          style={[styles.shiftTime, { color: colors.mutedForeground }]}
-        >
-          {req.offerShiftStart} → {req.offerShiftEnd}
+      <View style={styles.shiftHeaderRow}>
+        <Text style={[styles.shiftDate, { color: colors.primary }]}>
+          {formatDateShort(req.offerShiftDate)}
         </Text>
+        {req.offerShiftCode ? (
+          <View
+            style={[
+              styles.codeTag,
+              { backgroundColor: colors.muted, borderRadius: 6 },
+            ]}
+          >
+            <Text style={[styles.codeTagText, { color: colors.foreground }]}>
+              {req.offerShiftCode}
+            </Text>
+          </View>
+        ) : null}
+        {req.offerShiftVehicle ? (
+          <View style={styles.vehicleInline}>
+            <Feather name="truck" size={11} color={colors.mutedForeground} />
+            <Text style={[styles.vehicleText, { color: colors.mutedForeground }]}>
+              {req.offerShiftVehicle}
+            </Text>
+          </View>
+        ) : null}
       </View>
+      {req.offerShiftStops && req.offerShiftStops.length > 0 ? (
+        <StopsList stops={req.offerShiftStops} />
+      ) : (
+        <View style={styles.shiftRow}>
+          <Text style={[styles.shiftTime, { color: colors.mutedForeground }]}>
+            {req.offerShiftStart} → {req.offerShiftEnd}
+          </Text>
+        </View>
+      )}
       {req.status === "pending" ? (
         <Pressable
           onPress={handleCancel}
@@ -799,9 +862,63 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingBottom: 10,
   },
+  vehicleInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
   vehicleText: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
+  },
+  shiftHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 8,
+  },
+  stopsList: {
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+  },
+  stopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    minHeight: 24,
+  },
+  stopIndicator: {
+    width: 16,
+    alignItems: "center",
+    marginRight: 10,
+    paddingTop: 4,
+  },
+  stopDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1.5,
+  },
+  stopLine: {
+    width: 1.5,
+    flex: 1,
+    minHeight: 14,
+    marginTop: 2,
+  },
+  stopContent: {
+    flex: 1,
+    paddingBottom: 12,
+  },
+  stopLocation: {
+    fontSize: 13,
+    lineHeight: 17,
+  },
+  stopTime: {
+    fontSize: 13,
+    fontVariant: ["tabular-nums"],
+    lineHeight: 17,
+    paddingBottom: 12,
   },
   requestBtn: {
     flexDirection: "row",
