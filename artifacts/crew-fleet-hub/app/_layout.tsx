@@ -48,6 +48,13 @@ function RootLayoutNav() {
         }}
       />
       <Stack.Screen
+        name="shift-import"
+        options={{
+          presentation: "modal",
+          animation: "slide_from_bottom",
+        }}
+      />
+      <Stack.Screen
         name="breakdown-new"
         options={{
           presentation: "modal",
