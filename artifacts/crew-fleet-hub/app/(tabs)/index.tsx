@@ -385,6 +385,7 @@ function greetingFor(): string {
 function ServiceCard({ shift }: { shift: ShiftWithCalc }) {
   const colors = useColors();
   const router = useRouter();
+  const { setSwapAvailable } = useShifts();
   const codeLabel = shift.code?.trim() || "Sem código";
   const vehicleLabel = shift.vehicleCode?.trim();
   const affLabel =
@@ -532,6 +533,40 @@ function ServiceCard({ shift }: { shift: ShiftWithCalc }) {
           </Text>
         </View>
       </View>
+
+      <Pressable
+        onPress={() => setSwapAvailable(shift.id, !shift.availableForSwap)}
+        style={({ pressed }) => [
+          styles.swapToggleRow,
+          {
+            backgroundColor: shift.availableForSwap
+              ? colors.primary + "12"
+              : "transparent",
+            borderTopColor: colors.border,
+            opacity: pressed ? 0.7 : 1,
+          },
+        ]}
+      >
+        <Feather
+          name={shift.availableForSwap ? "check-square" : "square"}
+          size={15}
+          color={
+            shift.availableForSwap ? colors.primary : colors.mutedForeground
+          }
+        />
+        <Text
+          style={[
+            styles.swapToggleText,
+            {
+              color: shift.availableForSwap
+                ? colors.primary
+                : colors.mutedForeground,
+            },
+          ]}
+        >
+          Disponível para troca
+        </Text>
+      </Pressable>
     </Pressable>
   );
 }
@@ -762,5 +797,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_700Bold",
     marginTop: 2,
+  },
+  swapToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+  },
+  swapToggleText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
   },
 });

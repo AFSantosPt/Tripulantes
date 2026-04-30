@@ -63,7 +63,6 @@ export default function NewShiftScreen() {
   const [start, setStart] = useState<DraftStop>(EMPTY_STOP);
   const [end, setEnd] = useState<DraftStop>(EMPTY_STOP);
   const [notes, setNotes] = useState<string>("");
-  const [availableForSwap, setAvailableForSwap] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errors, setErrors] = useState<{
     date?: string;
@@ -87,7 +86,6 @@ export default function NewShiftScreen() {
     setStart({ location: first?.location ?? "", time: first?.time ?? "" });
     setEnd({ location: last?.location ?? "", time: last?.time ?? "" });
     setNotes(existing.notes ?? "");
-    setAvailableForSwap(existing.availableForSwap ?? false);
   }, [editingId, byId]);
 
   const dayShifts = useMemo<ShiftWithCalc[]>(
@@ -106,7 +104,6 @@ export default function NewShiftScreen() {
     setStart(EMPTY_STOP);
     setEnd(EMPTY_STOP);
     setNotes("");
-    setAvailableForSwap(false);
     setErrors({});
   };
 
@@ -170,7 +167,6 @@ export default function NewShiftScreen() {
         affectation,
         stops: cleanedStops,
         notes: notes.trim() || undefined,
-        availableForSwap,
       };
       const res = editingId
         ? await updateShift(editingId, payload)
@@ -410,51 +406,6 @@ export default function NewShiftScreen() {
                 </Text>
               </View>
             ) : null}
-
-            <Pressable
-              onPress={() => setAvailableForSwap((v) => !v)}
-              style={({ pressed }) => [
-                styles.swapToggle,
-                {
-                  backgroundColor: availableForSwap
-                    ? colors.primary + "18"
-                    : colors.card,
-                  borderColor: availableForSwap
-                    ? colors.primary
-                    : colors.border,
-                  borderRadius: colors.radius,
-                  opacity: pressed ? 0.8 : 1,
-                },
-              ]}
-            >
-              <Feather
-                name={availableForSwap ? "check-square" : "square"}
-                size={20}
-                color={availableForSwap ? colors.primary : colors.mutedForeground}
-              />
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[
-                    styles.swapToggleLabel,
-                    {
-                      color: availableForSwap
-                        ? colors.primary
-                        : colors.foreground,
-                    },
-                  ]}
-                >
-                  Disponível para troca
-                </Text>
-                <Text
-                  style={[
-                    styles.swapToggleHint,
-                    { color: colors.mutedForeground },
-                  ]}
-                >
-                  Outros tripulantes da mesma categoria podem pedir troca
-                </Text>
-              </View>
-            </Pressable>
 
             <PrimaryButton
               label={editingId ? "Atualizar serviço" : "Guardar serviço"}
@@ -900,22 +851,5 @@ const styles = StyleSheet.create({
   actionBtnText: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
-  },
-  swapToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderWidth: 1,
-  },
-  swapToggleLabel: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
-  swapToggleHint: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    marginTop: 2,
-    lineHeight: 16,
   },
 });
