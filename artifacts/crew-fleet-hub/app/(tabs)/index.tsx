@@ -84,10 +84,10 @@ export default function ShiftsScreen() {
         acc.total += s.totalMinutes;
         acc.normal += s.normalMinutes;
         acc.extra += s.extraMinutes;
-        acc.holiday += s.holidayMinutes;
+        acc.holidayDays += s.holidayMinutes > 0 ? 1 : 0;
         return acc;
       },
-      { total: 0, normal: 0, extra: 0, holiday: 0 },
+      { total: 0, normal: 0, extra: 0, holidayDays: 0 },
     );
   }, [rangeShifts]);
 
@@ -287,7 +287,7 @@ export default function ShiftsScreen() {
                   { color: colors.success },
                 ]}
               >
-                {formatMinutesToTime(monthTotals.holiday)}
+                {monthTotals.holidayDays}
               </Text>
             </View>
           </View>
