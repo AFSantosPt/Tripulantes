@@ -23,6 +23,7 @@ import {
 } from "@/contexts/ShiftsContext";
 import { useColors } from "@/hooks/useColors";
 import {
+  ABSENCE_TYPES,
   AffectationType,
   affectationDisplay,
   displayDateToIso,
@@ -150,30 +151,35 @@ export default function NewShiftScreen() {
     }));
   };
 
+  const isAbsenceType = ABSENCE_TYPES.has(affectation);
+
   const handleSave = async () => {
     const next: typeof errors = {};
     const iso = displayDateToIso(dateInput);
     if (!iso) {
       next.date = "Data inválida (DD-MM-AAAA)";
     }
-    const startTimeMin = parseTimeToMinutes(start.time);
-    const endTimeMin = parseTimeToMinutes(end.time);
-    const startErr: { location?: string; time?: string } = {};
-    if (!start.location.trim()) startErr.location = "Local obrigatório";
-    if (startTimeMin == null) startErr.time = "HH:MM";
-    if (Object.keys(startErr).length) next.start = startErr;
 
-    const endErr: { location?: string; time?: string } = {};
-    if (!end.location.trim()) endErr.location = "Local obrigatório";
-    if (endTimeMin == null) endErr.time = "HH:MM";
-    if (Object.keys(endErr).length) next.end = endErr;
+    if (!isAbsenceType) {
+      const startTimeMin = parseTimeToMinutes(start.time);
+      const endTimeMin = parseTimeToMinutes(end.time);
+      const startErr: { location?: string; time?: string } = {};
+      if (!start.location.trim()) startErr.location = "Local obrigatório";
+      if (startTimeMin == null) startErr.time = "HH:MM";
+      if (Object.keys(startErr).length) next.start = startErr;
 
-    if (
-      startTimeMin != null &&
-      endTimeMin != null &&
-      endTimeMin < startTimeMin
-    ) {
-      next.range = "A hora de fim tem de ser igual ou superior à de início";
+      const endErr: { location?: string; time?: string } = {};
+      if (!end.location.trim()) endErr.location = "Local obrigatório";
+      if (endTimeMin == null) endErr.time = "HH:MM";
+      if (Object.keys(endErr).length) next.end = endErr;
+
+      if (
+        startTimeMin != null &&
+        endTimeMin != null &&
+        endTimeMin < startTimeMin
+      ) {
+        next.range = "A hora de fim tem de ser igual ou superior à de início";
+      }
     }
 
     setErrors(next);
@@ -181,17 +187,19 @@ export default function NewShiftScreen() {
 
     setSubmitting(true);
     try {
-      const cleanedStops: ShiftStop[] = [
-        { location: start.location.trim(), time: start.time.trim() },
-        { location: end.location.trim(), time: end.time.trim() },
-      ];
+      const cleanedStops: ShiftStop[] = isAbsenceType
+        ? []
+        : [
+            { location: start.location.trim(), time: start.time.trim() },
+            { location: end.location.trim(), time: end.time.trim() },
+          ];
       const payload = {
         date: iso!,
-        code: code.trim() || undefined,
-        vehicleCode: vehicleCode.trim() || undefined,
+        code: isAbsenceType ? undefined : code.trim() || undefined,
+        vehicleCode: isAbsenceType ? undefined : vehicleCode.trim() || undefined,
         affectation,
         stops: cleanedStops,
-        notes: notes.trim() || undefined,
+        notes: isAbsenceType ? undefined : notes.trim() || undefined,
       };
       const res = editingId
         ? await updateShift(editingId, payload)
@@ -309,83 +317,6 @@ export default function NewShiftScreen() {
               </View>
             </View>
 
-            <View style={styles.row}>
-              <View style={{ flex: 1, gap: 6 }}>
-                <TextField
-                  label="Serviço"
-                  placeholder="Ex: 0115, Ordens"
-                  value={code}
-                  onChangeText={setCode}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  onFocus={() => {
-                    if (codeSuggestHideTimer.current)
-                      clearTimeout(codeSuggestHideTimer.current);
-                    setCodeFocused(true);
-                  }}
-                  onBlur={() => {
-                    codeSuggestHideTimer.current = setTimeout(
-                      () => setCodeFocused(false),
-                      180,
-                    );
-                  }}
-                />
-                {codeSuggestions.length > 0 ? (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    keyboardShouldPersistTaps="always"
-                    contentContainerStyle={styles.suggestRow}
-                  >
-                    {codeSuggestions.map((suggestion) => (
-                      <Pressable
-                        key={suggestion}
-                        onPress={() => {
-                          if (codeSuggestHideTimer.current)
-                            clearTimeout(codeSuggestHideTimer.current);
-                          setCode(suggestion);
-                          setCodeFocused(false);
-                        }}
-                        style={({ pressed }) => [
-                          styles.suggestChip,
-                          {
-                            backgroundColor:
-                              colors.primary + (pressed ? "30" : "18"),
-                            borderColor: colors.primary + "55",
-                            borderRadius: colors.radius,
-                          },
-                        ]}
-                      >
-                        <Feather
-                          name="clock"
-                          size={11}
-                          color={colors.primary}
-                        />
-                        <Text
-                          style={[
-                            styles.suggestChipText,
-                            { color: colors.primary },
-                          ]}
-                        >
-                          {suggestion}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                ) : null}
-              </View>
-              <View style={{ flex: 1 }}>
-                <TextField
-                  label="Serviço de Viatura"
-                  placeholder="Ex: 15E/06"
-                  value={vehicleCode}
-                  onChangeText={setVehicleCode}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
-
             <View style={{ gap: 6 }}>
               <Text style={[styles.label, { color: colors.foreground }]}>
                 Tipo de afetação
@@ -400,65 +331,159 @@ export default function NewShiftScreen() {
                   { value: "normalFO", label: "Normal FO" },
                 ]}
               />
-              <Text
-                style={[styles.smallHint, { color: colors.mutedForeground }]}
-              >
-                Selecione o tipo de afetação
-              </Text>
+              <SegmentedControl<AffectationType>
+                value={affectation}
+                onChange={setAffectation}
+                options={[
+                  { value: "folga", label: "Folga" },
+                  { value: "ferias", label: "Férias" },
+                ]}
+              />
             </View>
 
-            <StopCard
-              label="Início"
-              value={start}
-              onChange={(patch) => setStart((s) => ({ ...s, ...patch }))}
-              onClear={() => handleClearStop("start")}
-              errors={errors.start}
-            />
+            {!isAbsenceType ? (
+              <>
+                <View style={styles.row}>
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <TextField
+                      label="Serviço"
+                      placeholder="Ex: 0115, Ordens"
+                      value={code}
+                      onChangeText={setCode}
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      onFocus={() => {
+                        if (codeSuggestHideTimer.current)
+                          clearTimeout(codeSuggestHideTimer.current);
+                        setCodeFocused(true);
+                      }}
+                      onBlur={() => {
+                        codeSuggestHideTimer.current = setTimeout(
+                          () => setCodeFocused(false),
+                          180,
+                        );
+                      }}
+                    />
+                    {codeSuggestions.length > 0 ? (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        keyboardShouldPersistTaps="always"
+                        contentContainerStyle={styles.suggestRow}
+                      >
+                        {codeSuggestions.map((suggestion) => (
+                          <Pressable
+                            key={suggestion}
+                            onPress={() => {
+                              if (codeSuggestHideTimer.current)
+                                clearTimeout(codeSuggestHideTimer.current);
+                              setCode(suggestion);
+                              setCodeFocused(false);
+                            }}
+                            style={({ pressed }) => [
+                              styles.suggestChip,
+                              {
+                                backgroundColor:
+                                  colors.primary + (pressed ? "30" : "18"),
+                                borderColor: colors.primary + "55",
+                                borderRadius: colors.radius,
+                              },
+                            ]}
+                          >
+                            <Feather
+                              name="clock"
+                              size={11}
+                              color={colors.primary}
+                            />
+                            <Text
+                              style={[
+                                styles.suggestChipText,
+                                { color: colors.primary },
+                              ]}
+                            >
+                              {suggestion}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    ) : null}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <TextField
+                      label="Serviço de Viatura"
+                      placeholder="Ex: 15E/06"
+                      value={vehicleCode}
+                      onChangeText={setVehicleCode}
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                    />
+                  </View>
+                </View>
 
-            <StopCard
-              label="Fim"
-              value={end}
-              onChange={(patch) => setEnd((s) => ({ ...s, ...patch }))}
-              onClear={() => handleClearStop("end")}
-              errors={errors.end}
-            />
+                <StopCard
+                  label="Início"
+                  value={start}
+                  onChange={(patch) => setStart((s) => ({ ...s, ...patch }))}
+                  onClear={() => handleClearStop("start")}
+                  errors={errors.start}
+                />
 
-            <Text style={[styles.smallHint, { color: colors.mutedForeground }]}>
-              Suporta horas {">"} 24h (ex: 25:15)
-            </Text>
+                <StopCard
+                  label="Fim"
+                  value={end}
+                  onChange={(patch) => setEnd((s) => ({ ...s, ...patch }))}
+                  onClear={() => handleClearStop("end")}
+                  errors={errors.end}
+                />
 
-            {errors.range ? (
-              <Text style={[styles.errorText, { color: colors.destructive }]}>
-                {errors.range}
-              </Text>
+                <Text
+                  style={[styles.smallHint, { color: colors.mutedForeground }]}
+                >
+                  Suporta horas {">"} 24h (ex: 25:15)
+                </Text>
+
+                {errors.range ? (
+                  <Text
+                    style={[styles.errorText, { color: colors.destructive }]}
+                  >
+                    {errors.range}
+                  </Text>
+                ) : null}
+              </>
             ) : null}
 
-            <TextField
-              label="Notas (opcional)"
-              placeholder="Ex: linha 28, cobertura noturna"
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              style={{ minHeight: 80, textAlignVertical: "top" }}
-            />
-
-            <View
-              style={[
-                styles.infoBanner,
-                {
-                  backgroundColor: colors.muted,
-                  borderRadius: colors.radius,
-                },
-              ]}
-            >
-              <Feather name="info" size={16} color={colors.primary} />
-              <Text
-                style={[styles.infoBannerText, { color: colors.foreground }]}
-              >
-                Só é permitido salvar no mesmo dia se as horas não forem
-                iguais.
-              </Text>
-            </View>
+            {!isAbsenceType ? (
+              <>
+                <TextField
+                  label="Notas (opcional)"
+                  placeholder="Ex: linha 28, cobertura noturna"
+                  value={notes}
+                  onChangeText={setNotes}
+                  multiline
+                  style={{ minHeight: 80, textAlignVertical: "top" }}
+                />
+                <View
+                  style={[
+                    styles.infoBanner,
+                    {
+                      backgroundColor: colors.muted,
+                      borderRadius: colors.radius,
+                    },
+                  ]}
+                >
+                  <Feather name="info" size={16} color={colors.primary} />
+                  <Text
+                    style={[
+                      styles.infoBannerText,
+                      { color: colors.foreground },
+                    ]}
+                  >
+                    Só é permitido salvar no mesmo dia se as horas não forem
+                    iguais.
+                  </Text>
+                </View>
+              </>
+            ) : null}
 
             {errors.duplicate ? (
               <View

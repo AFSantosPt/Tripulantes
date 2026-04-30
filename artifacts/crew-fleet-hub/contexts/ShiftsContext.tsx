@@ -12,6 +12,7 @@ import React, {
 import { useAuth } from "@/contexts/AuthContext";
 import { newId } from "@/utils/id";
 import {
+  ABSENCE_TYPES,
   AffectationType,
   ShiftCalc,
   calcShiftMinutes,
@@ -170,6 +171,15 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
       input: Omit<Shift, "id" | "createdAt" | "crewMemberId">,
       ignoreId?: string,
     ): Shift | undefined => {
+      if (ABSENCE_TYPES.has(input.affectation)) {
+        return shiftsRef.current.find(
+          (s) =>
+            s.id !== ignoreId &&
+            s.crewMemberId === crewMemberId &&
+            s.date === input.date &&
+            s.affectation === input.affectation,
+        );
+      }
       const startTime = input.stops[0]?.time ?? "";
       const endTime = input.stops[input.stops.length - 1]?.time ?? "";
       return shiftsRef.current.find(
@@ -177,6 +187,7 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
           s.id !== ignoreId &&
           s.crewMemberId === crewMemberId &&
           s.date === input.date &&
+          !ABSENCE_TYPES.has(s.affectation) &&
           (s.stops[0]?.time ?? "") === startTime &&
           (s.stops[s.stops.length - 1]?.time ?? "") === endTime,
       );

@@ -465,6 +465,25 @@ function greetingFor(): string {
   return "Boa noite";
 }
 
+function affectationBadgeColors(
+  affectation: string,
+  colors: ReturnType<typeof useColors>,
+): { bg: string; text: string } {
+  switch (affectation) {
+    case "normalFO":
+      return { bg: colors.success + "22", text: colors.success };
+    case "extra1":
+    case "extra2":
+      return { bg: colors.accent, text: colors.accentForeground };
+    case "folga":
+      return { bg: colors.muted, text: colors.mutedForeground };
+    case "ferias":
+      return { bg: colors.primary + "18", text: colors.primary };
+    default:
+      return { bg: colors.muted, text: colors.mutedForeground };
+  }
+}
+
 function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) {
   const colors = useColors();
   const router = useRouter();
@@ -473,6 +492,8 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
   const affLabel =
     affectationDisplay(shift.affectation, shift.affectationLabel);
   const isPast = shift.date < today;
+  const isAbsence = shift.affectation === "folga" || shift.affectation === "ferias";
+  const badge = affectationBadgeColors(shift.affectation, colors);
 
   return (
     <Pressable
@@ -497,10 +518,10 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
           <Text
             style={[styles.cardKicker, { color: colors.mutedForeground }]}
           >
-            Serviço
+            {isAbsence ? "Ausência" : "Serviço"}
           </Text>
-          <Text style={[styles.cardCode, { color: colors.primary }]}>
-            {codeLabel}
+          <Text style={[styles.cardCode, { color: isAbsence ? badge.text : colors.primary }]}>
+            {isAbsence ? affLabel : codeLabel}
           </Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -521,40 +542,19 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
               </Text>
             </View>
           ) : null}
-          <View
-            style={[
-              styles.tag,
-              {
-                backgroundColor:
-                  shift.affectation === "normalFO"
-                    ? colors.success + "22"
-                    : shift.affectation === "normal"
-                      ? colors.muted
-                      : colors.accent,
-                borderRadius: 999,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.tagLabel,
-                {
-                  color:
-                    shift.affectation === "normalFO"
-                      ? colors.success
-                      : shift.affectation === "normal"
-                        ? colors.mutedForeground
-                        : colors.accentForeground,
-                },
-              ]}
+          {!isAbsence ? (
+            <View
+              style={[styles.tag, { backgroundColor: badge.bg, borderRadius: 999 }]}
             >
-              {affLabel}
-            </Text>
-          </View>
+              <Text style={[styles.tagLabel, { color: badge.text }]}>
+                {affLabel}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
-      {vehicleLabel ? (
+      {!isAbsence && vehicleLabel ? (
         <View style={styles.vehicleRow}>
           <Feather name="truck" size={13} color={colors.mutedForeground} />
           <Text
@@ -566,62 +566,66 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
         </View>
       ) : null}
 
-      <View style={[styles.stopsBox, { borderTopColor: colors.border }]}>
-        {shift.stops.map((stop, idx) => (
-          <View key={idx} style={styles.stopRow}>
-            <Text
-              style={[styles.stopLocation, { color: colors.foreground }]}
-              numberOfLines={1}
-            >
-              {stop.location?.trim() || "—"}
-            </Text>
-            <Text style={[styles.stopTime, { color: colors.foreground }]}>
-              {stop.time}
-            </Text>
-          </View>
-        ))}
-      </View>
+      {!isAbsence && shift.stops.length > 0 ? (
+        <View style={[styles.stopsBox, { borderTopColor: colors.border }]}>
+          {shift.stops.map((stop, idx) => (
+            <View key={idx} style={styles.stopRow}>
+              <Text
+                style={[styles.stopLocation, { color: colors.foreground }]}
+                numberOfLines={1}
+              >
+                {stop.location?.trim() || "—"}
+              </Text>
+              <Text style={[styles.stopTime, { color: colors.foreground }]}>
+                {stop.time}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
-      {shift.notes ? (
+      {!isAbsence && shift.notes ? (
         <Text style={[styles.notes, { color: colors.mutedForeground }]}>
           {shift.notes}
         </Text>
       ) : null}
 
-      <View style={[styles.cardFoot, { borderTopColor: colors.border }]}>
-        <View style={styles.footStat}>
-          <Text style={[styles.footLabel, { color: colors.mutedForeground }]}>
-            Total
-          </Text>
-          <Text style={[styles.footValue, { color: colors.foreground }]}>
-            {formatMinutesToTime(shift.totalMinutes)}
-          </Text>
+      {!isAbsence ? (
+        <View style={[styles.cardFoot, { borderTopColor: colors.border }]}>
+          <View style={styles.footStat}>
+            <Text style={[styles.footLabel, { color: colors.mutedForeground }]}>
+              Total
+            </Text>
+            <Text style={[styles.footValue, { color: colors.foreground }]}>
+              {formatMinutesToTime(shift.totalMinutes)}
+            </Text>
+          </View>
+          <View style={styles.footStat}>
+            <Text style={[styles.footLabel, { color: colors.mutedForeground }]}>
+              Normais
+            </Text>
+            <Text style={[styles.footValue, { color: colors.foreground }]}>
+              {formatMinutesToTime(shift.normalMinutes)}
+            </Text>
+          </View>
+          <View style={styles.footStat}>
+            <Text style={[styles.footLabel, { color: colors.mutedForeground }]}>
+              Extras
+            </Text>
+            <Text
+              style={[
+                styles.footValue,
+                {
+                  color:
+                    shift.extraMinutes > 0 ? colors.primary : colors.foreground,
+                },
+              ]}
+            >
+              {formatMinutesToTime(shift.extraMinutes)}
+            </Text>
+          </View>
         </View>
-        <View style={styles.footStat}>
-          <Text style={[styles.footLabel, { color: colors.mutedForeground }]}>
-            Normais
-          </Text>
-          <Text style={[styles.footValue, { color: colors.foreground }]}>
-            {formatMinutesToTime(shift.normalMinutes)}
-          </Text>
-        </View>
-        <View style={styles.footStat}>
-          <Text style={[styles.footLabel, { color: colors.mutedForeground }]}>
-            Extras
-          </Text>
-          <Text
-            style={[
-              styles.footValue,
-              {
-                color:
-                  shift.extraMinutes > 0 ? colors.primary : colors.foreground,
-              },
-            ]}
-          >
-            {formatMinutesToTime(shift.extraMinutes)}
-          </Text>
-        </View>
-      </View>
+      ) : null}
 
     </Pressable>
   );

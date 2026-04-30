@@ -1,10 +1,18 @@
-export type AffectationType = "normal" | "extra1" | "extra2" | "normalFO";
+export type AffectationType =
+  | "normal"
+  | "extra1"
+  | "extra2"
+  | "normalFO"
+  | "folga"
+  | "ferias";
 
 export const AFFECTATION_LABELS: Record<AffectationType, string> = {
   normal: "Normal",
   extra1: "Extra Tipo 1",
   extra2: "Extra Tipo 2",
   normalFO: "Normal FO",
+  folga: "Folga",
+  ferias: "Férias",
 };
 
 export const DEFAULT_AFFECTATION_LABELS: Record<AffectationType, string> = {
@@ -12,7 +20,14 @@ export const DEFAULT_AFFECTATION_LABELS: Record<AffectationType, string> = {
   extra1: "Extra Normal - Tipo1",
   extra2: "Extra Normal - Tipo2",
   normalFO: "Normal FO",
+  folga: "Folga",
+  ferias: "Férias",
 };
+
+export const ABSENCE_TYPES: ReadonlySet<AffectationType> = new Set([
+  "folga",
+  "ferias",
+]);
 
 const TZ = "Europe/Lisbon";
 const LOCALE = "pt-PT";
@@ -100,6 +115,9 @@ export function calcShiftMinutes(
   }
   if (affectation === "normalFO") {
     return { totalMinutes: total, normalMinutes: 0, extraMinutes: 0, holidayMinutes: total };
+  }
+  if (affectation === "folga" || affectation === "ferias") {
+    return { totalMinutes: 0, normalMinutes: 0, extraMinutes: 0, holidayMinutes: 0 };
   }
   const normal = Math.min(total, NORMAL_HOURS_BASE_MINUTES);
   const extra = Math.max(0, total - NORMAL_HOURS_BASE_MINUTES);
