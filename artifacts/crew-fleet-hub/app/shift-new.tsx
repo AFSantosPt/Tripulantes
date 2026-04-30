@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -64,6 +64,10 @@ export default function NewShiftScreen() {
   const [end, setEnd] = useState<DraftStop>(EMPTY_STOP);
   const [notes, setNotes] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [codeFocused, setCodeFocused] = useState<boolean>(false);
+  const codeSuggestHideTimer = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const [errors, setErrors] = useState<{
     date?: string;
     start?: { location?: string; time?: string };
@@ -95,6 +99,27 @@ export default function NewShiftScreen() {
         .sort((a, b) => a.startMinutes - b.startMinutes),
     [shifts, dateIso],
   );
+
+  const frequentCodes = useMemo<string[]>(() => {
+    const freq: Record<string, number> = {};
+    for (const s of shifts) {
+      const c = s.code?.trim();
+      if (c) freq[c] = (freq[c] ?? 0) + 1;
+    }
+    return Object.entries(freq)
+      .filter(([, count]) => count >= 3)
+      .sort((a, b) => b[1] - a[1])
+      .map(([c]) => c);
+  }, [shifts]);
+
+  const codeSuggestions = useMemo<string[]>(() => {
+    if (!codeFocused) return [];
+    const q = code.trim().toUpperCase();
+    if (!q) return frequentCodes.slice(0, 6);
+    return frequentCodes
+      .filter((c) => c.toUpperCase().startsWith(q) && c.toUpperCase() !== q)
+      .slice(0, 6);
+  }, [codeFocused, code, frequentCodes]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -285,7 +310,7 @@ export default function NewShiftScreen() {
             </View>
 
             <View style={styles.row}>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, gap: 6 }}>
                 <TextField
                   label="Serviço"
                   placeholder="Ex: 0115, Ordens"
@@ -293,7 +318,61 @@ export default function NewShiftScreen() {
                   onChangeText={setCode}
                   autoCapitalize="characters"
                   autoCorrect={false}
+                  onFocus={() => {
+                    if (codeSuggestHideTimer.current)
+                      clearTimeout(codeSuggestHideTimer.current);
+                    setCodeFocused(true);
+                  }}
+                  onBlur={() => {
+                    codeSuggestHideTimer.current = setTimeout(
+                      () => setCodeFocused(false),
+                      180,
+                    );
+                  }}
                 />
+                {codeSuggestions.length > 0 ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="always"
+                    contentContainerStyle={styles.suggestRow}
+                  >
+                    {codeSuggestions.map((suggestion) => (
+                      <Pressable
+                        key={suggestion}
+                        onPress={() => {
+                          if (codeSuggestHideTimer.current)
+                            clearTimeout(codeSuggestHideTimer.current);
+                          setCode(suggestion);
+                          setCodeFocused(false);
+                        }}
+                        style={({ pressed }) => [
+                          styles.suggestChip,
+                          {
+                            backgroundColor:
+                              colors.primary + (pressed ? "30" : "18"),
+                            borderColor: colors.primary + "55",
+                            borderRadius: colors.radius,
+                          },
+                        ]}
+                      >
+                        <Feather
+                          name="clock"
+                          size={11}
+                          color={colors.primary}
+                        />
+                        <Text
+                          style={[
+                            styles.suggestChipText,
+                            { color: colors.primary },
+                          ]}
+                        >
+                          {suggestion}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                ) : null}
               </View>
               <View style={{ flex: 1 }}>
                 <TextField
@@ -709,6 +788,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 0,
+  },
+  suggestRow: {
+    flexDirection: "row",
+    gap: 6,
+    paddingBottom: 2,
+  },
+  suggestChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+  },
+  suggestChipText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.4,
   },
   stopCard: {
     borderWidth: 1,
