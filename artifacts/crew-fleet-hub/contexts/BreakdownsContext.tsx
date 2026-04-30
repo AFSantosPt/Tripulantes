@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
   useCallback,
@@ -9,16 +8,13 @@ import React, {
 } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { newId } from "@/utils/id";
+import { apiFetch } from "@/utils/apiClient";
 
-const STORAGE_KEY = "@crew-fleet-hub/breakdowns/v1";
+export const BREAKDOWN_PHOTO_LIFETIME_DAYS = 14;
+export const BREAKDOWN_MAX_PHOTOS = 3;
 const REQUIRED_CONFIRMATIONS = 2;
-const PHOTO_LIFETIME_DAYS = 14;
-const PHOTO_LIFETIME_MS = PHOTO_LIFETIME_DAYS * 24 * 60 * 60 * 1000;
-const MAX_PHOTOS_PER_BREAKDOWN = 3;
-
-export const BREAKDOWN_PHOTO_LIFETIME_DAYS = PHOTO_LIFETIME_DAYS;
-export const BREAKDOWN_MAX_PHOTOS = MAX_PHOTOS_PER_BREAKDOWN;
+export const REQUIRED_CONFIRMATIONS_COUNT = REQUIRED_CONFIRMATIONS;
+const POLL_INTERVAL_MS = 30000;
 
 export type VehicleKind = "eletrico" | "autocarro";
 
@@ -55,8 +51,6 @@ export interface Breakdown {
   photos: BreakdownPhoto[];
 }
 
-export const REQUIRED_CONFIRMATIONS_COUNT = REQUIRED_CONFIRMATIONS;
-
 interface BreakdownsState {
   breakdowns: Breakdown[];
   active: Breakdown[];
@@ -75,52 +69,10 @@ interface BreakdownsState {
     uri: string,
   ) => Promise<{ ok: boolean; reason?: string }>;
   removePhoto: (breakdownId: string, photoId: string) => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const BreakdownsContext = createContext<BreakdownsState | null>(null);
-
-function normalizeBreakdown(raw: any): Breakdown {
-  return {
-    id: raw?.id ?? newId(),
-    vehicleKind: raw?.vehicleKind ?? "autocarro",
-    fleetNumber: String(raw?.fleetNumber ?? ""),
-    description: String(raw?.description ?? ""),
-    reportedById: String(raw?.reportedById ?? ""),
-    reportedByName: String(raw?.reportedByName ?? ""),
-    reportedByCrewId: String(raw?.reportedByCrewId ?? ""),
-    reportedAt: raw?.reportedAt ?? new Date().toISOString(),
-    confirmations: Array.isArray(raw?.confirmations) ? raw.confirmations : [],
-    photos: Array.isArray(raw?.photos)
-      ? raw.photos.map((p: any) => ({
-          id: String(p?.id ?? newId()),
-          uri: String(p?.uri ?? ""),
-          addedAt: String(p?.addedAt ?? new Date().toISOString()),
-          addedById: String(p?.addedById ?? ""),
-          addedByName: String(p?.addedByName ?? ""),
-        }))
-      : [],
-  };
-}
-
-function pruneExpiredPhotos(items: Breakdown[]): {
-  next: Breakdown[];
-  changed: boolean;
-} {
-  const now = Date.now();
-  let changed = false;
-  const next = items.map((b) => {
-    if (!b.photos || b.photos.length === 0) return b;
-    const fresh = b.photos.filter(
-      (p) => now - new Date(p.addedAt).getTime() < PHOTO_LIFETIME_MS,
-    );
-    if (fresh.length !== b.photos.length) {
-      changed = true;
-      return { ...b, photos: fresh };
-    }
-    return b;
-  });
-  return { next, changed };
-}
 
 export function BreakdownsProvider({
   children,
@@ -131,144 +83,122 @@ export function BreakdownsProvider({
   const [breakdowns, setBreakdowns] = useState<Breakdown[]>([]);
   const [isReady, setIsReady] = useState<boolean>(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            const normalized = parsed.map(normalizeBreakdown);
-            const { next, changed } = pruneExpiredPhotos(normalized);
-            setBreakdowns(next);
-            if (
-              changed ||
-              parsed.some((p: any, i: number) => !Array.isArray(p?.photos))
-            ) {
-              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("Breakdowns load error", e);
-      } finally {
-        setIsReady(true);
+  const fetchBreakdowns = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await apiFetch("/api/breakdowns", { memberId: user.id });
+      if (res.ok) {
+        const data = await res.json();
+        setBreakdowns(data.breakdowns as Breakdown[]);
       }
-    })();
-  }, []);
+    } catch {}
+  }, [user]);
 
-  const persist = useCallback(async (next: Breakdown[]) => {
-    setBreakdowns(next);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  }, []);
+  useEffect(() => {
+    if (!user) return;
+    fetchBreakdowns().finally(() => setIsReady(true));
+    const interval = setInterval(fetchBreakdowns, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [user, fetchBreakdowns]);
 
   const reportBreakdown = useCallback<BreakdownsState["reportBreakdown"]>(
     async (input) => {
       if (!user) throw new Error("Sem sessão iniciada");
-      const created: Breakdown = {
-        id: newId(),
-        vehicleKind: input.vehicleKind,
-        fleetNumber: input.fleetNumber.trim(),
-        description: input.description.trim(),
-        reportedById: user.id,
-        reportedByName: user.name,
-        reportedByCrewId: user.crewId,
-        reportedAt: new Date().toISOString(),
-        confirmations: [],
-        photos: [],
-      };
-      await persist([created, ...breakdowns]);
+      const res = await apiFetch("/api/breakdowns", {
+        method: "POST",
+        memberId: user.id,
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "Erro ao registar avaria");
+      }
+      const data = await res.json();
+      const created = data.breakdown as Breakdown;
+      setBreakdowns((prev) => [created, ...prev]);
       return created;
     },
-    [user, breakdowns, persist],
+    [user],
   );
 
   const confirmRepair = useCallback<BreakdownsState["confirmRepair"]>(
     async (id) => {
       if (!user) return { ok: false, reason: "Sem sessão iniciada" };
-      const target = breakdowns.find((b) => b.id === id);
-      if (!target) return { ok: false, reason: "Avaria não encontrada" };
-      if (target.reportedById === user.id) {
-        return {
-          ok: false,
-          reason: "Quem reportou não pode validar a sua própria avaria",
-        };
+      try {
+        const res = await apiFetch(`/api/breakdowns/${id}/confirm`, {
+          method: "POST",
+          memberId: user.id,
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, reason: data.error };
+        setBreakdowns((prev) =>
+          prev.map((b) => (b.id === id ? (data.breakdown as Breakdown) : b)),
+        );
+        return { ok: true };
+      } catch {
+        return { ok: false, reason: "Erro de ligação" };
       }
-      if (target.confirmations.some((c) => c.crewMemberId === user.id)) {
-        return { ok: false, reason: "Já validaste esta avaria" };
-      }
-      if (target.confirmations.length >= REQUIRED_CONFIRMATIONS) {
-        return { ok: false, reason: "Avaria já resolvida" };
-      }
-      const next = breakdowns.map((b) =>
-        b.id === id
-          ? {
-              ...b,
-              confirmations: [
-                ...b.confirmations,
-                {
-                  crewMemberId: user.id,
-                  crewMemberName: user.name,
-                  crewIdLabel: user.crewId,
-                  at: new Date().toISOString(),
-                },
-              ],
-            }
-          : b,
-      );
-      await persist(next);
-      return { ok: true };
     },
-    [user, breakdowns, persist],
+    [user],
   );
 
   const removeBreakdown = useCallback(
     async (id: string) => {
-      await persist(breakdowns.filter((b) => b.id !== id));
+      if (!user) return;
+      try {
+        const res = await apiFetch(`/api/breakdowns/${id}`, {
+          method: "DELETE",
+          memberId: user.id,
+        });
+        if (res.ok) setBreakdowns((prev) => prev.filter((b) => b.id !== id));
+      } catch {}
     },
-    [breakdowns, persist],
+    [user],
   );
 
   const addPhoto = useCallback<BreakdownsState["addPhoto"]>(
     async (breakdownId, uri) => {
       if (!user) return { ok: false, reason: "Sem sessão iniciada" };
-      if (!uri) return { ok: false, reason: "Imagem inválida" };
-      const target = breakdowns.find((b) => b.id === breakdownId);
-      if (!target) return { ok: false, reason: "Avaria não encontrada" };
-      if (target.photos.length >= MAX_PHOTOS_PER_BREAKDOWN) {
-        return {
-          ok: false,
-          reason: `Máximo de ${MAX_PHOTOS_PER_BREAKDOWN} fotografias por avaria`,
-        };
+      try {
+        const res = await apiFetch(`/api/breakdowns/${breakdownId}/photos`, {
+          method: "POST",
+          memberId: user.id,
+          body: JSON.stringify({ uri }),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, reason: data.error };
+        setBreakdowns((prev) =>
+          prev.map((b) =>
+            b.id === breakdownId ? (data.breakdown as Breakdown) : b,
+          ),
+        );
+        return { ok: true };
+      } catch {
+        return { ok: false, reason: "Erro de ligação" };
       }
-      const photo: BreakdownPhoto = {
-        id: newId(),
-        uri,
-        addedAt: new Date().toISOString(),
-        addedById: user.id,
-        addedByName: user.name,
-      };
-      const next = breakdowns.map((b) =>
-        b.id === breakdownId
-          ? { ...b, photos: [photo, ...b.photos] }
-          : b,
-      );
-      await persist(next);
-      return { ok: true };
     },
-    [user, breakdowns, persist],
+    [user],
   );
 
   const removePhoto = useCallback(
     async (breakdownId: string, photoId: string) => {
-      const next = breakdowns.map((b) =>
-        b.id === breakdownId
-          ? { ...b, photos: b.photos.filter((p) => p.id !== photoId) }
-          : b,
-      );
-      await persist(next);
+      if (!user) return;
+      try {
+        const res = await apiFetch(
+          `/api/breakdowns/${breakdownId}/photos/${photoId}`,
+          { method: "DELETE", memberId: user.id },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setBreakdowns((prev) =>
+            prev.map((b) =>
+              b.id === breakdownId ? (data.breakdown as Breakdown) : b,
+            ),
+          );
+        }
+      } catch {}
     },
-    [breakdowns, persist],
+    [user],
   );
 
   const value = useMemo<BreakdownsState>(() => {
@@ -292,6 +222,7 @@ export function BreakdownsProvider({
       removeBreakdown,
       addPhoto,
       removePhoto,
+      refresh: fetchBreakdowns,
     };
   }, [
     breakdowns,
@@ -301,6 +232,7 @@ export function BreakdownsProvider({
     removeBreakdown,
     addPhoto,
     removePhoto,
+    fetchBreakdowns,
   ]);
 
   return (

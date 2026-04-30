@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
   useCallback,
@@ -10,10 +9,10 @@ import React, {
 
 import { CrewCategory, useAuth } from "@/contexts/AuthContext";
 import { ShiftStop, ShiftWithCalc } from "@/contexts/ShiftsContext";
-import { newId } from "@/utils/id";
+import { apiFetch } from "@/utils/apiClient";
 import { todayIso } from "@/utils/time";
 
-const STORAGE_KEY = "@crew-fleet-hub/swaps/v1";
+const POLL_INTERVAL_MS = 30000;
 
 export type SwapStatus = "pending" | "confirmed" | "rejected";
 
@@ -59,100 +58,37 @@ interface SwapsState {
   confirmSwap: (id: string) => Promise<void>;
   rejectSwap: (id: string) => Promise<void>;
   cancelSwap: (id: string) => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const SwapsContext = createContext<SwapsState | null>(null);
-
-function normalizeSnapshot(raw: any): OfferShiftSnapshot {
-  return {
-    id: String(raw?.id ?? ""),
-    code: raw?.code ?? undefined,
-    vehicleCode: raw?.vehicleCode ?? undefined,
-    stops: Array.isArray(raw?.stops)
-      ? raw.stops.map((s: any) => ({
-          location: String(s?.location ?? ""),
-          time: String(s?.time ?? ""),
-        }))
-      : [],
-  };
-}
-
-function normalizeSwapRequest(raw: any): SwapRequest {
-  const validStatuses: SwapStatus[] = ["pending", "confirmed", "rejected"];
-  const firstId = String(raw?.offerShiftId ?? "");
-  const ids: string[] = Array.isArray(raw?.offerShiftIds)
-    ? raw.offerShiftIds.map(String)
-    : firstId
-      ? [firstId]
-      : [];
-  return {
-    id: String(raw?.id ?? newId()),
-    offerShiftId: firstId,
-    offerShiftIds: ids,
-    offerShifts: Array.isArray(raw?.offerShifts)
-      ? raw.offerShifts.map(normalizeSnapshot)
-      : [],
-    offererId: String(raw?.offererId ?? ""),
-    offererName: String(raw?.offererName ?? ""),
-    offererCrewId: String(raw?.offererCrewId ?? ""),
-    offererCategories: Array.isArray(raw?.offererCategories)
-      ? raw.offererCategories
-      : [],
-    offerShiftDate: String(raw?.offerShiftDate ?? ""),
-    offerShiftCode: raw?.offerShiftCode ?? undefined,
-    offerShiftStart: String(raw?.offerShiftStart ?? ""),
-    offerShiftEnd: String(raw?.offerShiftEnd ?? ""),
-    offerShiftStops: Array.isArray(raw?.offerShiftStops)
-      ? raw.offerShiftStops.map((s: any) => ({
-          location: String(s?.location ?? ""),
-          time: String(s?.time ?? ""),
-        }))
-      : [],
-    offerShiftVehicle: raw?.offerShiftVehicle ?? undefined,
-    requesterId: String(raw?.requesterId ?? ""),
-    requesterName: String(raw?.requesterName ?? ""),
-    requesterCrewId: String(raw?.requesterCrewId ?? ""),
-    requesterCategories: Array.isArray(raw?.requesterCategories)
-      ? raw.requesterCategories
-      : [],
-    status: validStatuses.includes(raw?.status) ? raw.status : "pending",
-    createdAt: raw?.createdAt ?? new Date().toISOString(),
-  };
-}
 
 export function SwapsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [swapRequests, setSwapRequests] = useState<SwapRequest[]>([]);
   const [isReady, setIsReady] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            const today = todayIso();
-            const normalized = parsed.map(normalizeSwapRequest);
-            const fresh = normalized.filter((r) => r.offerShiftDate >= today);
-            setSwapRequests(fresh);
-            if (fresh.length !== normalized.length) {
-              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("Swaps load error", e);
-      } finally {
-        setIsReady(true);
+  const fetchSwaps = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await apiFetch("/api/swaps", { memberId: user.id });
+      if (res.ok) {
+        const data = await res.json();
+        const today = todayIso();
+        const fresh = (data.swapRequests as SwapRequest[]).filter(
+          (r) => r.offerShiftDate >= today,
+        );
+        setSwapRequests(fresh);
       }
-    })();
-  }, []);
+    } catch {}
+  }, [user]);
 
-  const persist = useCallback(async (next: SwapRequest[]) => {
-    setSwapRequests(next);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  }, []);
+  useEffect(() => {
+    if (!user) return;
+    fetchSwaps().finally(() => setIsReady(true));
+    const interval = setInterval(fetchSwaps, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [user, fetchSwaps]);
 
   const requestSwap = useCallback(
     async ({
@@ -172,22 +108,9 @@ export function SwapsProvider({ children }: { children: React.ReactNode }) {
       const first = sorted[0];
       if (first.crewMemberId === user.id)
         return { ok: false, reason: "Não podes trocar contigo próprio" };
-      const shiftIds = sorted.map((s) => s.id);
-      const existing = swapRequests.find(
-        (r) =>
-          r.offerShiftIds.some((id) => shiftIds.includes(id)) &&
-          r.requesterId === user.id &&
-          r.status === "pending",
-      );
-      if (existing)
-        return {
-          ok: false,
-          reason: "Já enviaste um pedido para este dia",
-        };
-      const req: SwapRequest = {
-        id: newId(),
+      const body = {
         offerShiftId: first.id,
-        offerShiftIds: shiftIds,
+        offerShiftIds: sorted.map((s) => s.id),
         offerShifts: sorted.map((s) => ({
           id: s.id,
           code: s.code,
@@ -201,60 +124,85 @@ export function SwapsProvider({ children }: { children: React.ReactNode }) {
         offerShiftDate: first.date,
         offerShiftCode: first.code,
         offerShiftStart: first.stops[0]?.time ?? "00:00",
-        offerShiftEnd: sorted[sorted.length - 1].stops[sorted[sorted.length - 1].stops.length - 1]?.time ?? "00:00",
+        offerShiftEnd:
+          sorted[sorted.length - 1].stops[
+            sorted[sorted.length - 1].stops.length - 1
+          ]?.time ?? "00:00",
         offerShiftStops: sorted.flatMap((s) => s.stops),
         offerShiftVehicle: first.vehicleCode,
-        requesterId: user.id,
-        requesterName: user.name,
-        requesterCrewId: user.crewId,
-        requesterCategories: user.categories ?? [],
-        status: "pending",
-        createdAt: new Date().toISOString(),
       };
-      await persist([...swapRequests, req]);
-      return { ok: true };
+      try {
+        const res = await apiFetch("/api/swaps", {
+          method: "POST",
+          memberId: user.id,
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, reason: data.error ?? "Erro" };
+        setSwapRequests((prev) => [...prev, data.swapRequest as SwapRequest]);
+        return { ok: true };
+      } catch {
+        return { ok: false, reason: "Erro de ligação" };
+      }
     },
-    [user, swapRequests, persist],
+    [user],
   );
 
   const confirmSwap = useCallback(
     async (id: string) => {
       if (!user) return;
-      await persist(
-        swapRequests.map((r) =>
-          r.id === id && r.offererId === user.id && r.status === "pending"
-            ? { ...r, status: "confirmed" as const }
-            : r,
-        ),
-      );
+      try {
+        const res = await apiFetch(`/api/swaps/${id}/confirm`, {
+          method: "POST",
+          memberId: user.id,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSwapRequests((prev) =>
+            prev.map((r) =>
+              r.id === id ? (data.swapRequest as SwapRequest) : r,
+            ),
+          );
+        }
+      } catch {}
     },
-    [user, swapRequests, persist],
+    [user],
   );
 
   const rejectSwap = useCallback(
     async (id: string) => {
       if (!user) return;
-      await persist(
-        swapRequests.map((r) =>
-          r.id === id && r.offererId === user.id && r.status === "pending"
-            ? { ...r, status: "rejected" as const }
-            : r,
-        ),
-      );
+      try {
+        const res = await apiFetch(`/api/swaps/${id}/reject`, {
+          method: "POST",
+          memberId: user.id,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSwapRequests((prev) =>
+            prev.map((r) =>
+              r.id === id ? (data.swapRequest as SwapRequest) : r,
+            ),
+          );
+        }
+      } catch {}
     },
-    [user, swapRequests, persist],
+    [user],
   );
 
   const cancelSwap = useCallback(
     async (id: string) => {
       if (!user) return;
-      await persist(
-        swapRequests.filter(
-          (r) => !(r.id === id && r.requesterId === user.id),
-        ),
-      );
+      try {
+        const res = await apiFetch(`/api/swaps/${id}`, {
+          method: "DELETE",
+          memberId: user.id,
+        });
+        if (res.ok)
+          setSwapRequests((prev) => prev.filter((r) => r.id !== id));
+      } catch {}
     },
-    [user, swapRequests, persist],
+    [user],
   );
 
   const value = useMemo<SwapsState>(
@@ -265,6 +213,7 @@ export function SwapsProvider({ children }: { children: React.ReactNode }) {
       confirmSwap,
       rejectSwap,
       cancelSwap,
+      refresh: fetchSwaps,
     }),
     [
       swapRequests,
@@ -273,6 +222,7 @@ export function SwapsProvider({ children }: { children: React.ReactNode }) {
       confirmSwap,
       rejectSwap,
       cancelSwap,
+      fetchSwaps,
     ],
   );
 
