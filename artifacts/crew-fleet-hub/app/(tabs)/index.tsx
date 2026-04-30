@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,10 +19,12 @@ import { useColors } from "@/hooks/useColors";
 import {
   affectationDisplay,
   dateYear,
+  displayDateToIso,
   formatDayHeadline,
   formatHoursDecimal,
   formatMinutesToTime,
   isoMonthKey,
+  isoToDisplayDate,
   monthLabel,
   todayIso,
 } from "@/utils/time";
@@ -37,12 +40,43 @@ export default function ShiftsScreen() {
   const [selectedDate, setSelectedDate] = useState<string>(today);
 
   const currentMonthKey = isoMonthKey(selectedDate);
-  const monthShifts = useMemo(
-    () => shifts.filter((s) => isoMonthKey(s.date) === currentMonthKey),
-    [shifts, currentMonthKey],
+
+  const defaultRangeStart = today.substring(0, 7) + "-01";
+  const defaultRangeEnd = (() => {
+    const y = parseInt(today.substring(0, 4), 10);
+    const m = parseInt(today.substring(5, 7), 10);
+    return new Date(y, m, 0).toISOString().substring(0, 10);
+  })();
+
+  const [rangeStart, setRangeStart] = useState<string>(defaultRangeStart);
+  const [rangeEnd, setRangeEnd] = useState<string>(defaultRangeEnd);
+  const [rangeStartText, setRangeStartText] = useState<string>(
+    isoToDisplayDate(defaultRangeStart),
+  );
+  const [rangeEndText, setRangeEndText] = useState<string>(
+    isoToDisplayDate(defaultRangeEnd),
+  );
+
+  const handleRangeStartChange = (text: string) => {
+    setRangeStartText(text);
+    const iso = displayDateToIso(text);
+    if (iso) setRangeStart(iso);
+  };
+  const handleRangeEndChange = (text: string) => {
+    setRangeEndText(text);
+    const iso = displayDateToIso(text);
+    if (iso) setRangeEnd(iso);
+  };
+
+  const rangeShifts = useMemo(
+    () =>
+      shifts.filter(
+        (s) => s.date >= rangeStart && s.date <= rangeEnd,
+      ),
+    [shifts, rangeStart, rangeEnd],
   );
   const monthTotals = useMemo(() => {
-    return monthShifts.reduce(
+    return rangeShifts.reduce(
       (acc, s) => {
         acc.total += s.totalMinutes;
         acc.normal += s.normalMinutes;
@@ -51,7 +85,7 @@ export default function ShiftsScreen() {
       },
       { total: 0, normal: 0, extra: 0 },
     );
-  }, [monthShifts]);
+  }, [rangeShifts]);
 
   const markedDates = useMemo(
     () => Array.from(new Set(shifts.map((s) => s.date))),
@@ -118,14 +152,46 @@ export default function ShiftsScreen() {
             },
           ]}
         >
-          <Text
-            style={[
-              styles.summaryLabel,
-              { color: colors.primaryForeground, opacity: 0.7 },
-            ]}
-          >
-            {monthLabel(currentMonthKey).toUpperCase()}
-          </Text>
+          <View style={styles.rangeRow}>
+            <View style={styles.rangeField}>
+              <Text style={styles.rangeFieldLabel}>De</Text>
+              <TextInput
+                style={[
+                  styles.rangeInput,
+                  { color: colors.primaryForeground },
+                ]}
+                value={rangeStartText}
+                onChangeText={handleRangeStartChange}
+                placeholder="DD-MM-AAAA"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                keyboardType="numeric"
+                maxLength={10}
+                returnKeyType="done"
+              />
+            </View>
+            <Feather
+              name="arrow-right"
+              size={14}
+              color="rgba(255,255,255,0.5)"
+              style={{ marginTop: 18 }}
+            />
+            <View style={styles.rangeField}>
+              <Text style={styles.rangeFieldLabel}>Até</Text>
+              <TextInput
+                style={[
+                  styles.rangeInput,
+                  { color: colors.primaryForeground },
+                ]}
+                value={rangeEndText}
+                onChangeText={handleRangeEndChange}
+                placeholder="DD-MM-AAAA"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                keyboardType="numeric"
+                maxLength={10}
+                returnKeyType="done"
+              />
+            </View>
+          </View>
           <Text
             style={[styles.summaryHours, { color: colors.primaryForeground }]}
           >
@@ -137,8 +203,8 @@ export default function ShiftsScreen() {
               { color: colors.primaryForeground, opacity: 0.7 },
             ]}
           >
-            {formatHoursDecimal(monthTotals.total)} h · {monthShifts.length}{" "}
-            serviço{monthShifts.length === 1 ? "" : "s"}
+            {formatHoursDecimal(monthTotals.total)} h · {rangeShifts.length}{" "}
+            serviço{rangeShifts.length === 1 ? "" : "s"}
           </Text>
           <View style={styles.summaryStats}>
             <View style={styles.summaryStat}>
@@ -480,10 +546,30 @@ const styles = StyleSheet.create({
     padding: 22,
     gap: 4,
   },
-  summaryLabel: {
-    fontSize: 12,
+  rangeRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 10,
+    marginBottom: 4,
+  },
+  rangeField: {
+    flex: 1,
+    gap: 2,
+  },
+  rangeFieldLabel: {
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 1,
+    color: "rgba(255,255,255,0.55)",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  rangeInput: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.25)",
+    paddingBottom: 4,
+    paddingTop: 2,
   },
   summaryHours: {
     fontSize: 44,

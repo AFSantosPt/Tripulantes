@@ -12,7 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { newId } from "@/utils/id";
 
 const STORAGE_KEY = "@crew-fleet-hub/breakdowns/v1";
-const REQUIRED_CONFIRMATIONS = 3;
+const REQUIRED_CONFIRMATIONS = 2;
 const PHOTO_LIFETIME_DAYS = 14;
 const PHOTO_LIFETIME_MS = PHOTO_LIFETIME_DAYS * 24 * 60 * 60 * 1000;
 const MAX_PHOTOS_PER_BREAKDOWN = 3;
