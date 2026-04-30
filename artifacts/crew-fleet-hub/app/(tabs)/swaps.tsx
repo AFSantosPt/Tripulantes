@@ -198,23 +198,28 @@ function EmptySection({ label }: { label: string }) {
   );
 }
 
-function AvailableShiftCard({
-  shift,
+function AvailableDayCard({
+  shifts,
   offererName,
   offererCrewId,
   offererCategories,
   onRequest,
 }: {
-  shift: ShiftWithCalc;
+  shifts: ShiftWithCalc[];
   offererName: string;
   offererCrewId: string;
   offererCategories: CrewCategory[];
   onRequest: () => void;
 }) {
   const colors = useColors();
+  const date = shifts[0]?.date ?? "";
+  const codesLabel = shifts
+    .map((s) => s.code)
+    .filter(Boolean)
+    .join(", ");
 
   const handlePress = () => {
-    const msg = `Pedir troca do serviço${shift.code ? ` ${shift.code}` : ""} de ${offererName} (${formatDateShort(shift.date)})?`;
+    const msg = `Pedir troca do dia ${formatDateShort(date)}${codesLabel ? ` (${codesLabel})` : ""} de ${offererName}?`;
     if (Platform.OS === "web") {
       if (typeof window !== "undefined" && window.confirm(msg)) onRequest();
       return;
@@ -247,43 +252,50 @@ function AvailableShiftCard({
           <Text style={[styles.cardName, { color: colors.foreground }]}>
             {offererName}
           </Text>
-          <Text
-            style={[styles.cardCrewId, { color: colors.mutedForeground }]}
-          >
+          <Text style={[styles.cardCrewId, { color: colors.mutedForeground }]}>
             Nº {offererCrewId}
           </Text>
           <CategoryChips categories={offererCategories} />
         </View>
       </View>
-      <View
-        style={[styles.cardDivider, { backgroundColor: colors.border }]}
-      />
+      <View style={[styles.cardDivider, { backgroundColor: colors.border }]} />
       <View style={styles.shiftHeaderRow}>
         <Text style={[styles.shiftDate, { color: colors.primary }]}>
-          {formatDateShort(shift.date)}
+          {formatDateShort(date)}
         </Text>
-        {shift.code ? (
-          <View
-            style={[
-              styles.codeTag,
-              { backgroundColor: colors.muted, borderRadius: 6 },
-            ]}
-          >
-            <Text style={[styles.codeTagText, { color: colors.foreground }]}>
-              {shift.code}
-            </Text>
-          </View>
-        ) : null}
-        {shift.vehicleCode ? (
-          <View style={styles.vehicleInline}>
-            <Feather name="truck" size={11} color={colors.mutedForeground} />
-            <Text style={[styles.vehicleText, { color: colors.mutedForeground }]}>
-              {shift.vehicleCode}
-            </Text>
-          </View>
-        ) : null}
       </View>
-      <StopsList stops={shift.stops} />
+      {shifts.map((shift, idx) => (
+        <View key={shift.id}>
+          {idx > 0 && (
+            <View
+              style={[styles.servicesDivider, { backgroundColor: colors.border }]}
+            />
+          )}
+          <View style={styles.serviceCodeRow}>
+            {shift.code ? (
+              <View
+                style={[
+                  styles.codeTag,
+                  { backgroundColor: colors.muted, borderRadius: 6 },
+                ]}
+              >
+                <Text style={[styles.codeTagText, { color: colors.foreground }]}>
+                  {shift.code}
+                </Text>
+              </View>
+            ) : null}
+            {shift.vehicleCode ? (
+              <View style={styles.vehicleInline}>
+                <Feather name="truck" size={11} color={colors.mutedForeground} />
+                <Text style={[styles.vehicleText, { color: colors.mutedForeground }]}>
+                  {shift.vehicleCode}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <StopsList stops={shift.stops} />
+        </View>
+      ))}
       <Pressable
         onPress={handlePress}
         style={({ pressed }) => [
@@ -296,9 +308,7 @@ function AvailableShiftCard({
         ]}
       >
         <Feather name="repeat" size={14} color={colors.primaryForeground} />
-        <Text
-          style={[styles.requestBtnText, { color: colors.primaryForeground }]}
-        >
+        <Text style={[styles.requestBtnText, { color: colors.primaryForeground }]}>
           Pedir troca
         </Text>
       </Pressable>
@@ -380,35 +390,46 @@ function SentRequestCard({
           </Text>
         </View>
       </View>
-      <View
-        style={[styles.cardDivider, { backgroundColor: colors.border }]}
-      />
+      <View style={[styles.cardDivider, { backgroundColor: colors.border }]} />
       <View style={styles.shiftHeaderRow}>
         <Text style={[styles.shiftDate, { color: colors.primary }]}>
           {formatDateShort(req.offerShiftDate)}
         </Text>
-        {req.offerShiftCode ? (
-          <View
-            style={[
-              styles.codeTag,
-              { backgroundColor: colors.muted, borderRadius: 6 },
-            ]}
-          >
-            <Text style={[styles.codeTagText, { color: colors.foreground }]}>
-              {req.offerShiftCode}
-            </Text>
-          </View>
-        ) : null}
-        {req.offerShiftVehicle ? (
-          <View style={styles.vehicleInline}>
-            <Feather name="truck" size={11} color={colors.mutedForeground} />
-            <Text style={[styles.vehicleText, { color: colors.mutedForeground }]}>
-              {req.offerShiftVehicle}
-            </Text>
-          </View>
-        ) : null}
       </View>
-      {req.offerShiftStops && req.offerShiftStops.length > 0 ? (
+      {req.offerShifts && req.offerShifts.length > 0 ? (
+        req.offerShifts.map((s, idx) => (
+          <View key={s.id || idx}>
+            {idx > 0 && (
+              <View
+                style={[styles.servicesDivider, { backgroundColor: colors.border }]}
+              />
+            )}
+            <View style={styles.serviceCodeRow}>
+              {s.code ? (
+                <View
+                  style={[
+                    styles.codeTag,
+                    { backgroundColor: colors.muted, borderRadius: 6 },
+                  ]}
+                >
+                  <Text style={[styles.codeTagText, { color: colors.foreground }]}>
+                    {s.code}
+                  </Text>
+                </View>
+              ) : null}
+              {s.vehicleCode ? (
+                <View style={styles.vehicleInline}>
+                  <Feather name="truck" size={11} color={colors.mutedForeground} />
+                  <Text style={[styles.vehicleText, { color: colors.mutedForeground }]}>
+                    {s.vehicleCode}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <StopsList stops={s.stops} />
+          </View>
+        ))
+      ) : req.offerShiftStops && req.offerShiftStops.length > 0 ? (
         <StopsList stops={req.offerShiftStops} />
       ) : (
         <View style={styles.shiftRow}>
@@ -578,9 +599,9 @@ export default function SwapsScreen() {
 
   const today = todayIso();
 
-  const availableShifts = useMemo(() => {
+  const availableDayGroups = useMemo(() => {
     if (!user) return [];
-    return allShifts.filter((s) => {
+    const filtered = allShifts.filter((s) => {
       if (!s.availableForSwap) return false;
       if (s.date < today) return false;
       if (s.crewMemberId === user.id) return false;
@@ -588,14 +609,26 @@ export default function SwapsScreen() {
       if (!offerer) return false;
       if (!categoriesCompatible(user.categories ?? [], offerer.categories ?? []))
         return false;
-      const alreadyRequested = swapRequests.some(
-        (r) =>
-          r.offerShiftId === s.id &&
-          r.requesterId === user.id &&
-          r.status !== "rejected",
-      );
-      return !alreadyRequested;
+      return true;
     });
+    const groups = new Map<string, ShiftWithCalc[]>();
+    for (const s of filtered) {
+      const key = `${s.crewMemberId}::${s.date}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(s);
+    }
+    return Array.from(groups.values())
+      .map((g) => g.sort((a, b) => a.startMinutes - b.startMinutes))
+      .filter((g) => {
+        const ids = g.map((s) => s.id);
+        return !swapRequests.some(
+          (r) =>
+            r.offerShiftIds.some((id) => ids.includes(id)) &&
+            r.requesterId === user.id &&
+            r.status !== "rejected",
+        );
+      })
+      .sort((a, b) => a[0].date.localeCompare(b[0].date));
   }, [allShifts, user, members, swapRequests, today]);
 
   const sentRequests = useMemo(
@@ -622,11 +655,12 @@ export default function SwapsScreen() {
     [swapRequests, user],
   );
 
-  const handleRequest = async (shift: ShiftWithCalc) => {
-    const offerer = members.find((m) => m.id === shift.crewMemberId);
+  const handleRequest = async (shifts: ShiftWithCalc[]) => {
+    if (!shifts.length) return;
+    const offerer = members.find((m) => m.id === shifts[0].crewMemberId);
     if (!offerer) return;
     await requestSwap({
-      shift,
+      shifts,
       offererName: offerer.name,
       offererCrewId: offerer.crewId,
       offererCategories: offerer.categories ?? [],
@@ -672,21 +706,22 @@ export default function SwapsScreen() {
         )}
 
         <SectionHeader title="Disponíveis para mim" />
-        {availableShifts.length === 0 ? (
+        {availableDayGroups.length === 0 ? (
           <EmptySection label="Nenhum serviço disponível para troca com a tua categoria." />
         ) : (
           <View style={{ gap: 12 }}>
-            {availableShifts.map((s) => {
-              const offerer = members.find((m) => m.id === s.crewMemberId);
+            {availableDayGroups.map((group) => {
+              const offerer = members.find((m) => m.id === group[0].crewMemberId);
               if (!offerer) return null;
+              const key = `${group[0].crewMemberId}::${group[0].date}`;
               return (
-                <AvailableShiftCard
-                  key={s.id}
-                  shift={s}
+                <AvailableDayCard
+                  key={key}
+                  shifts={group}
                   offererName={offerer.name}
                   offererCrewId={offerer.crewId}
                   offererCategories={offerer.categories ?? []}
-                  onRequest={() => handleRequest(s)}
+                  onRequest={() => handleRequest(group)}
                 />
               );
             })}
@@ -878,6 +913,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 8,
+  },
+  serviceCodeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingBottom: 6,
+  },
+  servicesDivider: {
+    height: 1,
+    marginHorizontal: 14,
+    marginBottom: 10,
   },
   stopsList: {
     paddingHorizontal: 14,
