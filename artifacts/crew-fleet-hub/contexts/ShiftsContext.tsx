@@ -5,6 +5,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -125,6 +126,7 @@ function decorate(shift: Shift): ShiftWithCalc {
 export function ShiftsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const shiftsRef = useRef<Shift[]>([]);
   const [isReady, setIsReady] = useState<boolean>(false);
 
   useEffect(() => {
@@ -135,6 +137,7 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
             const migrated = parsed.map(migrateLoadedShift);
+            shiftsRef.current = migrated;
             setShifts(migrated);
             const needsRewrite = migrated.some(
               (m, i) => !Array.isArray(parsed[i]?.stops),
@@ -156,6 +159,7 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const persist = useCallback(async (next: Shift[]) => {
+    shiftsRef.current = next;
     setShifts(next);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   }, []);
@@ -168,7 +172,7 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
     ): Shift | undefined => {
       const startTime = input.stops[0]?.time ?? "";
       const endTime = input.stops[input.stops.length - 1]?.time ?? "";
-      return shifts.find(
+      return shiftsRef.current.find(
         (s) =>
           s.id !== ignoreId &&
           s.crewMemberId === crewMemberId &&
@@ -177,7 +181,7 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
           (s.stops[s.stops.length - 1]?.time ?? "") === endTime,
       );
     },
-    [shifts],
+    [],
   );
 
   const addShift = useCallback<ShiftsState["addShift"]>(
@@ -196,16 +200,16 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
         crewMemberId: user.id,
         createdAt: new Date().toISOString(),
       };
-      await persist([newShift, ...shifts]);
+      await persist([newShift, ...shiftsRef.current]);
       return { ok: true, id: newShift.id };
     },
-    [shifts, persist, user, findDuplicate],
+    [persist, user, findDuplicate],
   );
 
   const updateShift = useCallback<ShiftsState["updateShift"]>(
     async (id, input) => {
       if (!user) return { ok: false, reason: "Sem sessão iniciada" };
-      const existing = shifts.find((s) => s.id === id);
+      const existing = shiftsRef.current.find((s) => s.id === id);
       if (!existing) return { ok: false, reason: "Serviço não encontrado" };
       if (existing.crewMemberId !== user.id) {
         return { ok: false, reason: "Sem permissão para editar este serviço" };
@@ -221,44 +225,44 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
         ...existing,
         ...input,
       };
-      await persist(shifts.map((s) => (s.id === id ? updated : s)));
+      await persist(shiftsRef.current.map((s) => (s.id === id ? updated : s)));
       return { ok: true, id };
     },
-    [shifts, persist, user, findDuplicate],
+    [persist, user, findDuplicate],
   );
 
   const removeShift = useCallback(
     async (id: string) => {
-      await persist(shifts.filter((s) => s.id !== id));
+      await persist(shiftsRef.current.filter((s) => s.id !== id));
     },
-    [shifts, persist],
+    [persist],
   );
 
   const setSwapAvailable = useCallback(
     async (id: string, available: boolean) => {
       await persist(
-        shifts.map((s) => (s.id === id ? { ...s, availableForSwap: available } : s)),
+        shiftsRef.current.map((s) => (s.id === id ? { ...s, availableForSwap: available } : s)),
       );
     },
-    [shifts, persist],
+    [persist],
   );
 
   const setMultipleSwapAvailable = useCallback(
     async (ids: string[], available: boolean) => {
       const set = new Set(ids);
       await persist(
-        shifts.map((s) => (set.has(s.id) ? { ...s, availableForSwap: available } : s)),
+        shiftsRef.current.map((s) => (set.has(s.id) ? { ...s, availableForSwap: available } : s)),
       );
     },
-    [shifts, persist],
+    [persist],
   );
 
   const byId = useCallback(
     (id: string) => {
-      const raw = shifts.find((s) => s.id === id);
+      const raw = shiftsRef.current.find((s) => s.id === id);
       return raw ? decorate(raw) : undefined;
     },
-    [shifts],
+    [],
   );
 
   const value = useMemo<ShiftsState>(() => {
