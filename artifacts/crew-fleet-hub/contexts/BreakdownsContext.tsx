@@ -15,8 +15,10 @@ const STORAGE_KEY = "@crew-fleet-hub/breakdowns/v1";
 const REQUIRED_CONFIRMATIONS = 3;
 const PHOTO_LIFETIME_DAYS = 14;
 const PHOTO_LIFETIME_MS = PHOTO_LIFETIME_DAYS * 24 * 60 * 60 * 1000;
+const MAX_PHOTOS_PER_BREAKDOWN = 3;
 
 export const BREAKDOWN_PHOTO_LIFETIME_DAYS = PHOTO_LIFETIME_DAYS;
+export const BREAKDOWN_MAX_PHOTOS = MAX_PHOTOS_PER_BREAKDOWN;
 
 export type VehicleKind = "eletrico" | "autocarro";
 
@@ -233,6 +235,12 @@ export function BreakdownsProvider({
       if (!uri) return { ok: false, reason: "Imagem inválida" };
       const target = breakdowns.find((b) => b.id === breakdownId);
       if (!target) return { ok: false, reason: "Avaria não encontrada" };
+      if (target.photos.length >= MAX_PHOTOS_PER_BREAKDOWN) {
+        return {
+          ok: false,
+          reason: `Máximo de ${MAX_PHOTOS_PER_BREAKDOWN} fotografias por avaria`,
+        };
+      }
       const photo: BreakdownPhoto = {
         id: newId(),
         uri,

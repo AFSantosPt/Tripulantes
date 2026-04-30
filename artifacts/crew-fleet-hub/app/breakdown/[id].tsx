@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  BREAKDOWN_MAX_PHOTOS,
   BREAKDOWN_PHOTO_LIFETIME_DAYS,
   BreakdownPhoto,
   Confirmation,
@@ -331,41 +332,91 @@ export default function BreakdownDetailScreen() {
         <View style={{ gap: 10 }}>
           <View style={styles.photosHeader}>
             <View style={{ flex: 1 }}>
-              <Text
-                style={[styles.sectionTitle, { color: colors.mutedForeground }]}
-              >
-                Fotografias
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text
+                  style={[styles.sectionTitle, { color: colors.mutedForeground }]}
+                >
+                  Fotografias
+                </Text>
+                <View
+                  style={[
+                    styles.photoCountBadge,
+                    {
+                      backgroundColor:
+                        breakdown.photos.length >= BREAKDOWN_MAX_PHOTOS
+                          ? colors.muted
+                          : colors.accent,
+                      borderRadius: 999,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.photoCountText,
+                      {
+                        color:
+                          breakdown.photos.length >= BREAKDOWN_MAX_PHOTOS
+                            ? colors.mutedForeground
+                            : colors.accentForeground,
+                      },
+                    ]}
+                  >
+                    {breakdown.photos.length}/{BREAKDOWN_MAX_PHOTOS}
+                  </Text>
+                </View>
+              </View>
               <Text
                 style={[styles.photosHint, { color: colors.mutedForeground }]}
               >
-                As fotos expiram após {BREAKDOWN_PHOTO_LIFETIME_DAYS} dias
+                Máx. {BREAKDOWN_MAX_PHOTOS} fotos · expiram após{" "}
+                {BREAKDOWN_PHOTO_LIFETIME_DAYS} dias
               </Text>
             </View>
             <Pressable
               onPress={handleAddPhoto}
-              disabled={uploading}
+              disabled={uploading || breakdown.photos.length >= BREAKDOWN_MAX_PHOTOS}
               style={({ pressed }) => [
                 styles.photoAddBtn,
                 {
-                  backgroundColor: colors.accent,
+                  backgroundColor:
+                    breakdown.photos.length >= BREAKDOWN_MAX_PHOTOS
+                      ? colors.muted
+                      : colors.accent,
                   borderRadius: colors.radius,
-                  opacity: pressed || uploading ? 0.8 : 1,
+                  opacity:
+                    pressed ||
+                    uploading ||
+                    breakdown.photos.length >= BREAKDOWN_MAX_PHOTOS
+                      ? 0.6
+                      : 1,
                 },
               ]}
             >
               <Feather
                 name={uploading ? "loader" : "camera"}
                 size={16}
-                color={colors.accentForeground}
+                color={
+                  breakdown.photos.length >= BREAKDOWN_MAX_PHOTOS
+                    ? colors.mutedForeground
+                    : colors.accentForeground
+                }
               />
               <Text
                 style={[
                   styles.photoAddLabel,
-                  { color: colors.accentForeground },
+                  {
+                    color:
+                      breakdown.photos.length >= BREAKDOWN_MAX_PHOTOS
+                        ? colors.mutedForeground
+                        : colors.accentForeground,
+                  },
                 ]}
               >
-                {uploading ? "A carregar..." : "Adicionar"}
+                {uploading
+                  ? "A carregar..."
+                  : breakdown.photos.length >= BREAKDOWN_MAX_PHOTOS
+                    ? "Limite atingido"
+                    : "Adicionar"}
               </Text>
             </Pressable>
           </View>
@@ -784,6 +835,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  photoCountBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  photoCountText: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
   },
   photosHint: {
     fontSize: 12,
