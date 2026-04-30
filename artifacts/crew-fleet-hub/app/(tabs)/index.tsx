@@ -45,7 +45,10 @@ export default function ShiftsScreen() {
   const defaultRangeEnd = (() => {
     const y = parseInt(today.substring(0, 4), 10);
     const m = parseInt(today.substring(5, 7), 10);
-    return new Date(y, m, 0).toISOString().substring(0, 10);
+    const lastDay = new Date(y, m, 0);
+    const dd = String(lastDay.getDate()).padStart(2, "0");
+    const mm = String(lastDay.getMonth() + 1).padStart(2, "0");
+    return `${lastDay.getFullYear()}-${mm}-${dd}`;
   })();
 
   const [rangeStart, setRangeStart] = useState<string>(defaultRangeStart);
