@@ -23,9 +23,14 @@ export interface ImportResult {
 
 const TIME_RE = /\b(\d{1,3}):([0-5]\d)\b/;
 const TIME_RE_GLOBAL = /\b(\d{1,3}):([0-5]\d)\b/g;
-const VEHICLE_RE = /\b(\d{1,3}[A-Z]\/\d{1,3})\b/;
+const VEHICLE_RE = /\b(\d{1,3}[A-Za-zÀ-ÿ]+\/\d{1,3}|[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9]*\/\d{1,3})\b/;
 const ISO_DATE_RE = /\b(\d{4})-(\d{2})-(\d{2})\b/;
 const PT_DATE_RE = /\b(\d{2})[-/](\d{2})[-/](\d{4})\b/;
+
+const OCR_SERVICE_LINE_RE =
+  /^servi[çc]o\s+([A-Z0-9]+)\s*-\s*([^\s-][^-]*?)\s*-\s*(.+)$/i;
+const OCR_CODE_ONLY_RE = /^servi[çc]o\s+([A-Z0-9]+)$/i;
+const OBS_LINE_RE = /^obs(?:erva[çc][aã]o)?[:\s]+(.+)$/i;
 
 function detectAffectation(value: string): {
   type: AffectationType;
@@ -394,10 +399,35 @@ function tryParseText(
     let startLocation = "";
     let endLocation = "";
     let code: string | undefined;
+    let notes: string | undefined;
+    let ocrVehicle: string | undefined;
+    let ocrAffRaw: string | undefined;
     for (const line of lines) {
+      const obsMatch = OBS_LINE_RE.exec(line);
+      if (obsMatch) {
+        notes = obsMatch[1].trim();
+        continue;
+      }
+      const svcFull = OCR_SERVICE_LINE_RE.exec(line);
+      if (svcFull) {
+        code = svcFull[1].trim();
+        ocrVehicle = svcFull[2].trim();
+        ocrAffRaw = svcFull[3].trim();
+        continue;
+      }
+      const svcCode = OCR_CODE_ONLY_RE.exec(line);
+      if (svcCode) {
+        code = svcCode[1].trim();
+        continue;
+      }
       const lineTimes: string[] = line.match(TIME_RE_GLOBAL) ?? [];
       if (lineTimes.length === 0) {
-        if (!code && /^[A-Z0-9][A-Z0-9/\- ]{1,20}$/i.test(line)) {
+        if (
+          !code &&
+          !ISO_DATE_RE.test(line) &&
+          !PT_DATE_RE.test(line) &&
+          /^[A-Z0-9][A-Z0-9/\- ]{1,20}$/i.test(line)
+        ) {
           code = line;
         }
         continue;
@@ -413,18 +443,21 @@ function tryParseText(
         endLocation = stripped;
       }
     }
+    const resolvedVehicle = ocrVehicle ?? vehicleCode;
+    const resolvedAff = ocrAffRaw ? detectAffectation(ocrAffRaw) : aff;
     if (!startLocation) startLocation = "—";
     if (!endLocation) endLocation = startLocation;
     shifts.push({
       date,
       code: code?.trim(),
-      vehicleCode,
-      affectation: aff.type,
-      affectationLabel: aff.label,
+      vehicleCode: resolvedVehicle,
+      affectation: resolvedAff.type,
+      affectationLabel: resolvedAff.label,
       startLocation,
       startTime,
       endLocation,
       endTime,
+      notes,
     });
   }
   return shifts;
