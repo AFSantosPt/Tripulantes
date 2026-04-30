@@ -13,7 +13,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EmptyState } from "@/components/EmptyState";
-import { CrewMember, useAuth } from "@/contexts/AuthContext";
+import {
+  CREW_CATEGORY_LABELS,
+  CrewCategory,
+  CrewMember,
+  useAuth,
+} from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
 type Section =
@@ -287,7 +292,7 @@ export default function TeamScreen() {
                       {m.name.charAt(0).toUpperCase()}
                     </Text>
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, gap: 4 }}>
                     <Text
                       style={[
                         styles.memberName,
@@ -305,6 +310,12 @@ export default function TeamScreen() {
                       Nº {m.crewId} · pedido em{" "}
                       {new Date(m.createdAt).toLocaleDateString("pt-PT")}
                     </Text>
+                    {m.categories && m.categories.length > 0 ? (
+                      <CategoryChips
+                        categories={m.categories}
+                        colors={colors}
+                      />
+                    ) : null}
                   </View>
                 </View>
                 <View style={styles.actionRow}>
@@ -404,7 +415,7 @@ export default function TeamScreen() {
                     {m.name.charAt(0).toUpperCase()}
                   </Text>
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, gap: 4 }}>
                   <View style={styles.nameLine}>
                     <Text
                       style={[
@@ -446,10 +457,42 @@ export default function TeamScreen() {
                   >
                     Nº {m.crewId}
                   </Text>
+                  {m.categories && m.categories.length > 0 ? (
+                    <CategoryChips
+                      categories={m.categories}
+                      colors={colors}
+                    />
+                  ) : null}
                 </View>
               </View>
               {isAdmin && !isSelf ? (
                 <View style={styles.actionRow}>
+                  <Pressable
+                    onPress={() =>
+                      router.push({
+                        pathname: "/crew-categories",
+                        params: { id: m.id },
+                      })
+                    }
+                    style={({ pressed }) => [
+                      styles.actionBtnGhost,
+                      {
+                        borderColor: colors.border,
+                        borderRadius: colors.radius,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                  >
+                    <Feather name="tag" size={14} color={colors.foreground} />
+                    <Text
+                      style={[
+                        styles.actionLabelSm,
+                        { color: colors.foreground },
+                      ]}
+                    >
+                      Categorias
+                    </Text>
+                  </Pressable>
                   <Pressable
                     onPress={() =>
                       confirmAction(
@@ -482,7 +525,7 @@ export default function TeamScreen() {
                         { color: colors.foreground },
                       ]}
                     >
-                      {m.isAdmin ? "Remover admin" : "Tornar admin"}
+                      {m.isAdmin ? "Rem. admin" : "Tornar admin"}
                     </Text>
                   </Pressable>
                   <Pressable
@@ -532,6 +575,49 @@ export default function TeamScreen() {
     </View>
   );
 }
+
+function CategoryChips({
+  categories,
+  colors,
+}: {
+  categories: CrewCategory[];
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <View style={chipStyles.row}>
+      {categories.map((cat) => (
+        <View
+          key={cat}
+          style={[
+            chipStyles.chip,
+            { backgroundColor: colors.muted, borderRadius: 999 },
+          ]}
+        >
+          <Text style={[chipStyles.chipText, { color: colors.mutedForeground }]}>
+            {CREW_CATEGORY_LABELS[cat]}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const chipStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 2,
+  },
+  chip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  chipText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
+});
 
 const styles = StyleSheet.create({
   root: { flex: 1 },

@@ -22,6 +22,20 @@ const DEFAULT_ADMIN = {
 
 export type AccountStatus = "pending" | "active";
 
+export type CrewCategory = "guarda-freio" | "motorista" | "outro";
+
+export const ALL_CREW_CATEGORIES: CrewCategory[] = [
+  "guarda-freio",
+  "motorista",
+  "outro",
+];
+
+export const CREW_CATEGORY_LABELS: Record<CrewCategory, string> = {
+  "guarda-freio": "Guarda-Freio",
+  motorista: "Motorista",
+  outro: "Outro",
+};
+
 export interface CrewMember {
   id: string;
   name: string;
@@ -29,6 +43,7 @@ export interface CrewMember {
   passwordHash: string;
   status: AccountStatus;
   isAdmin: boolean;
+  categories: CrewCategory[];
   createdAt: string;
   approvedAt?: string;
   approvedById?: string;
@@ -55,11 +70,16 @@ interface AuthState {
     name: string;
     crewId: string;
     password: string;
+    categories: CrewCategory[];
   }) => Promise<RegisterResult>;
   approveMember: (id: string) => Promise<void>;
   rejectMember: (id: string) => Promise<void>;
   toggleAdmin: (id: string) => Promise<void>;
   removeMember: (id: string) => Promise<void>;
+  updateCategories: (
+    memberId: string,
+    categories: CrewCategory[],
+  ) => Promise<void>;
   changePassword: (input: {
     current: string;
     next: string;
@@ -70,6 +90,25 @@ const AuthContext = createContext<AuthState | null>(null);
 
 function normalizeCrewId(crewId: string): string {
   return crewId.trim().toLowerCase();
+}
+
+function normalizeMember(raw: any): CrewMember {
+  return {
+    id: String(raw?.id ?? ""),
+    name: String(raw?.name ?? ""),
+    crewId: String(raw?.crewId ?? ""),
+    passwordHash: String(raw?.passwordHash ?? ""),
+    status: raw?.status === "active" ? "active" : "pending",
+    isAdmin: Boolean(raw?.isAdmin),
+    categories: Array.isArray(raw?.categories)
+      ? (raw.categories as string[]).filter((c): c is CrewCategory =>
+          ALL_CREW_CATEGORIES.includes(c as CrewCategory),
+        )
+      : [],
+    createdAt: raw?.createdAt ?? new Date().toISOString(),
+    approvedAt: raw?.approvedAt,
+    approvedById: raw?.approvedById,
+  };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -85,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(SESSION_KEY),
         ]);
         let loadedMembers: CrewMember[] = rawMembers
-          ? JSON.parse(rawMembers)
+          ? (JSON.parse(rawMembers) as any[]).map(normalizeMember)
           : [];
         if (loadedMembers.length === 0) {
           const seed: CrewMember = {
@@ -95,6 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             passwordHash: hashPassword(DEFAULT_ADMIN.password),
             status: "active",
             isAdmin: true,
+            categories: ["motorista"],
             createdAt: new Date().toISOString(),
             approvedAt: new Date().toISOString(),
           };
@@ -165,7 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [persistSession]);
 
   const registerRequest = useCallback<AuthState["registerRequest"]>(
-    async ({ name, crewId, password }) => {
+    async ({ name, crewId, password, categories }) => {
       const trimmedName = name.trim();
       const trimmedCrewId = crewId.trim();
       if (!trimmedName) return { ok: false, error: "Indica o teu nome" };
@@ -173,6 +213,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, error: "Indica o teu Nº Tripulante" };
       if (password.length < 4)
         return { ok: false, error: "Password tem de ter pelo menos 4 caracteres" };
+      if (categories.length === 0)
+        return { ok: false, error: "Seleciona pelo menos uma categoria" };
 
       const idLower = normalizeCrewId(trimmedCrewId);
       const existing = members.find(
@@ -194,6 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         passwordHash: hashPassword(password),
         status: autoActivated ? "active" : "pending",
         isAdmin: autoActivated,
+        categories,
         createdAt: new Date().toISOString(),
         approvedAt: autoActivated ? new Date().toISOString() : undefined,
       };
@@ -251,6 +294,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await persistMembers(next);
       if (id === user.id) {
         const updated = next.find((m) => m.id === id);
+        if (updated) await persistSession(updated);
+      }
+    },
+    [members, persistMembers, persistSession, user],
+  );
+
+  const updateCategories = useCallback(
+    async (memberId: string, categories: CrewCategory[]) => {
+      if (!user?.isAdmin) return;
+      const next = members.map((m) =>
+        m.id === memberId ? { ...m, categories } : m,
+      );
+      await persistMembers(next);
+      if (memberId === user.id) {
+        const updated = next.find((m) => m.id === memberId);
         if (updated) await persistSession(updated);
       }
     },
@@ -322,6 +380,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       rejectMember,
       toggleAdmin,
       removeMember,
+      updateCategories,
       changePassword,
     };
   }, [
@@ -335,6 +394,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     rejectMember,
     toggleAdmin,
     removeMember,
+    updateCategories,
     changePassword,
   ]);
 

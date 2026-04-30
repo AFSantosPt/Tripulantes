@@ -15,7 +15,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { TextField } from "@/components/TextField";
-import { useAuth } from "@/contexts/AuthContext";
+import {
+  ALL_CREW_CATEGORIES,
+  CREW_CATEGORY_LABELS,
+  CrewCategory,
+  useAuth,
+} from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
 export default function RegisterScreen() {
@@ -27,8 +32,15 @@ export default function RegisterScreen() {
   const [crewId, setCrewId] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirm, setConfirm] = useState<string>("");
+  const [categories, setCategories] = useState<CrewCategory[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  const toggleCategory = (cat: CrewCategory) => {
+    setCategories((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+    );
+  };
 
   const showInfo = (title: string, message: string, onClose?: () => void) => {
     if (Platform.OS === "web") {
@@ -45,9 +57,13 @@ export default function RegisterScreen() {
       setError("As passwords não coincidem");
       return;
     }
+    if (categories.length === 0) {
+      setError("Seleciona pelo menos uma categoria");
+      return;
+    }
     setSubmitting(true);
     try {
-      const result = await registerRequest({ name, crewId, password });
+      const result = await registerRequest({ name, crewId, password, categories });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -136,6 +152,64 @@ export default function RegisterScreen() {
               returnKeyType="next"
               testID="register-crew-id"
             />
+
+            <View style={styles.categoryBlock}>
+              <Text
+                style={[styles.categoryLabel, { color: colors.mutedForeground }]}
+              >
+                Categoria
+              </Text>
+              <Text
+                style={[styles.categoryHint, { color: colors.mutedForeground }]}
+              >
+                Podes selecionar mais do que uma
+              </Text>
+              <View style={styles.categoryRow}>
+                {ALL_CREW_CATEGORIES.map((cat) => {
+                  const selected = categories.includes(cat);
+                  return (
+                    <Pressable
+                      key={cat}
+                      onPress={() => toggleCategory(cat)}
+                      style={({ pressed }) => [
+                        styles.categoryChip,
+                        {
+                          backgroundColor: selected
+                            ? colors.primary
+                            : colors.card,
+                          borderColor: selected
+                            ? colors.primary
+                            : colors.border,
+                          borderRadius: colors.radius,
+                          opacity: pressed ? 0.85 : 1,
+                        },
+                      ]}
+                    >
+                      {selected ? (
+                        <Feather
+                          name="check"
+                          size={13}
+                          color={colors.primaryForeground}
+                        />
+                      ) : null}
+                      <Text
+                        style={[
+                          styles.categoryChipText,
+                          {
+                            color: selected
+                              ? colors.primaryForeground
+                              : colors.foreground,
+                          },
+                        ]}
+                      >
+                        {CREW_CATEGORY_LABELS[cat]}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
             <TextField
               label="Password"
               placeholder="Mínimo 4 caracteres"
@@ -204,4 +278,33 @@ const styles = StyleSheet.create({
     maxWidth: 360,
   },
   form: { gap: 14 },
+  categoryBlock: {
+    gap: 6,
+  },
+  categoryLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  categoryHint: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+  },
+  categoryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4,
+  },
+  categoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderWidth: 1,
+  },
+  categoryChipText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
 });

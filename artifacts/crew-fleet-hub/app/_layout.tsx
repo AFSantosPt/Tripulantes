@@ -62,6 +62,13 @@ function RootLayoutNav() {
         }}
       />
       <Stack.Screen name="breakdown/[id]" />
+      <Stack.Screen
+        name="crew-categories"
+        options={{
+          presentation: "modal",
+          animation: "slide_from_bottom",
+        }}
+      />
     </Stack>
   );
 }
