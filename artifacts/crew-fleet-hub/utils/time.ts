@@ -1,15 +1,17 @@
-export type AffectationType = "normal" | "extra1" | "extra2";
+export type AffectationType = "normal" | "extra1" | "extra2" | "normalFO";
 
 export const AFFECTATION_LABELS: Record<AffectationType, string> = {
   normal: "Normal",
   extra1: "Extra Tipo 1",
   extra2: "Extra Tipo 2",
+  normalFO: "Normal FO",
 };
 
 export const DEFAULT_AFFECTATION_LABELS: Record<AffectationType, string> = {
   normal: "Normal",
   extra1: "Extra Normal - Tipo1",
   extra2: "Extra Normal - Tipo2",
+  normalFO: "Normal FO",
 };
 
 const TZ = "Europe/Lisbon";
@@ -84,6 +86,7 @@ export interface ShiftCalc {
   totalMinutes: number;
   normalMinutes: number;
   extraMinutes: number;
+  holidayMinutes: number;
 }
 
 export function calcShiftMinutes(
@@ -93,7 +96,10 @@ export function calcShiftMinutes(
 ): ShiftCalc {
   const total = Math.max(0, endMinutes - startMinutes);
   if (affectation === "extra1" || affectation === "extra2") {
-    return { totalMinutes: total, normalMinutes: 0, extraMinutes: total };
+    return { totalMinutes: total, normalMinutes: 0, extraMinutes: total, holidayMinutes: 0 };
+  }
+  if (affectation === "normalFO") {
+    return { totalMinutes: total, normalMinutes: 0, extraMinutes: 0, holidayMinutes: total };
   }
   const normal = Math.min(total, NORMAL_HOURS_BASE_MINUTES);
   const extra = Math.max(0, total - NORMAL_HOURS_BASE_MINUTES);
@@ -101,6 +107,7 @@ export function calcShiftMinutes(
     totalMinutes: total,
     normalMinutes: normal,
     extraMinutes: extra,
+    holidayMinutes: 0,
   };
 }
 

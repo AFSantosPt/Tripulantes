@@ -42,7 +42,7 @@ Para este exemplo, o output correto seria:
 - Data: converte DD/MM/YYYY → YYYY-MM-DD. Se não houver data, omite essa linha.
 - CODIGO: código do serviço (ex: C514, 0115, 303). Se não existir, omite.
 - VIATURA: valor do campo "Serviço de Viatura" (ex: Glória/04, 15E/06). Se não existir, omite.
-- TIPO: valor do campo "Tipo de Afetação" (ex: Normal, Extra Tipo 1). Se não existir, omite.
+- TIPO: valor do campo "Tipo de Afetação" (ex: Normal, Normal FO, Extra Tipo 1, Extra Tipo 2). Se não existir, omite. "Normal FO" indica serviço em feriado.
 - LOCAL_INICIO e LOCAL_FIM: nome das paragens/locais conforme aparecem na imagem.
 - HH:MM: formato 24h com zero à esquerda (ex: 06:30, 14:00, 22:00).
 - A primeira linha de horário (mais cedo) é o início; a segunda (mais tarde) é o fim.

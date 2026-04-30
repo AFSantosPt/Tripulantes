@@ -39,6 +39,8 @@ function detectAffectation(value: string): {
   const v = value.trim();
   const lower = v.toLowerCase();
   if (!v) return { type: "normal" };
+  if (/normal\s*fo\b/i.test(v)) return { type: "normalFO", label: v };
+  if (lower.includes("feriado")) return { type: "normalFO", label: v };
   if (lower.includes("extra")) {
     if (/2|ii\b|tipo\s*2/i.test(v)) return { type: "extra2", label: v };
     if (/1|i\b|tipo\s*1/i.test(v)) return { type: "extra1", label: v };

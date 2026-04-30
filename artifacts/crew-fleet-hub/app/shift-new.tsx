@@ -397,6 +397,7 @@ export default function NewShiftScreen() {
                   { value: "normal", label: "Normal" },
                   { value: "extra1", label: "Extra 1" },
                   { value: "extra2", label: "Extra 2" },
+                  { value: "normalFO", label: "Normal FO" },
                 ]}
               />
               <Text

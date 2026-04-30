@@ -84,9 +84,10 @@ export default function ShiftsScreen() {
         acc.total += s.totalMinutes;
         acc.normal += s.normalMinutes;
         acc.extra += s.extraMinutes;
+        acc.holiday += s.holidayMinutes;
         return acc;
       },
-      { total: 0, normal: 0, extra: 0 },
+      { total: 0, normal: 0, extra: 0, holiday: 0 },
     );
   }, [rangeShifts]);
 
@@ -260,6 +261,33 @@ export default function ShiftsScreen() {
                 ]}
               >
                 {formatMinutesToTime(monthTotals.extra)}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.summaryDivider,
+                {
+                  backgroundColor: colors.primaryForeground,
+                  opacity: 0.15,
+                },
+              ]}
+            />
+            <View style={styles.summaryStat}>
+              <Text
+                style={[
+                  styles.summaryStatLabel,
+                  { color: colors.success, opacity: 0.95 },
+                ]}
+              >
+                Feriados
+              </Text>
+              <Text
+                style={[
+                  styles.summaryStatValue,
+                  { color: colors.success },
+                ]}
+              >
+                {formatMinutesToTime(monthTotals.holiday)}
               </Text>
             </View>
           </View>
@@ -498,7 +526,11 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
               styles.tag,
               {
                 backgroundColor:
-                  shift.affectation === "normal" ? colors.muted : colors.accent,
+                  shift.affectation === "normalFO"
+                    ? colors.success + "22"
+                    : shift.affectation === "normal"
+                      ? colors.muted
+                      : colors.accent,
                 borderRadius: 999,
               },
             ]}
@@ -508,9 +540,11 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
                 styles.tagLabel,
                 {
                   color:
-                    shift.affectation === "normal"
-                      ? colors.mutedForeground
-                      : colors.accentForeground,
+                    shift.affectation === "normalFO"
+                      ? colors.success
+                      : shift.affectation === "normal"
+                        ? colors.mutedForeground
+                        : colors.accentForeground,
                 },
               ]}
             >
