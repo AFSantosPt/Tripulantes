@@ -6,6 +6,48 @@ export const AFFECTATION_LABELS: Record<AffectationType, string> = {
   extra2: "Extra Tipo 2",
 };
 
+export const DEFAULT_AFFECTATION_LABELS: Record<AffectationType, string> = {
+  normal: "Normal",
+  extra1: "Extra Normal - Tipo1",
+  extra2: "Extra Normal - Tipo2",
+};
+
+export function affectationDisplay(
+  type: AffectationType,
+  custom?: string,
+): string {
+  const trimmed = custom?.trim();
+  if (trimmed) return trimmed;
+  return DEFAULT_AFFECTATION_LABELS[type];
+}
+
+export function isoToDisplayDate(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const [y, m, d] = iso.split("-");
+  return `${d}-${m}-${y}`;
+}
+
+export function displayDateToIso(input: string): string | null {
+  const t = input.trim();
+  const m = t.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  const day = Number(dd);
+  const month = Number(mm);
+  const year = Number(yyyy);
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+  const probe = new Date(year, month - 1, day);
+  if (
+    probe.getFullYear() !== year ||
+    probe.getMonth() !== month - 1 ||
+    probe.getDate() !== day
+  ) {
+    return null;
+  }
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export function parseTimeToMinutes(input: string): number | null {
   const trimmed = input.trim();
   if (!trimmed) return null;

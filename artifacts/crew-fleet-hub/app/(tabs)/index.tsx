@@ -16,7 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useShifts, ShiftWithCalc } from "@/contexts/ShiftsContext";
 import { useColors } from "@/hooks/useColors";
 import {
-  AFFECTATION_LABELS,
+  affectationDisplay,
   dateYear,
   formatDayHeadline,
   formatHoursDecimal,
@@ -293,7 +293,7 @@ function ServiceCard({ shift }: { shift: ShiftWithCalc }) {
   const codeLabel = shift.code?.trim() || "Sem código";
   const vehicleLabel = shift.vehicleCode?.trim();
   const affLabel =
-    shift.affectationLabel?.trim() || AFFECTATION_LABELS[shift.affectation];
+    affectationDisplay(shift.affectation, shift.affectationLabel);
 
   return (
     <Pressable

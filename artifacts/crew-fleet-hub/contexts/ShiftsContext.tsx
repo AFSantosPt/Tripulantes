@@ -43,14 +43,25 @@ export interface ShiftWithCalc extends Shift, ShiftCalc {
   endMinutes: number;
 }
 
+export interface SaveShiftResult {
+  ok: boolean;
+  reason?: string;
+  id?: string;
+}
+
 interface ShiftsState {
   shifts: ShiftWithCalc[];
   allShifts: ShiftWithCalc[];
   isReady: boolean;
   addShift: (
     input: Omit<Shift, "id" | "createdAt" | "crewMemberId">,
-  ) => Promise<void>;
+  ) => Promise<SaveShiftResult>;
+  updateShift: (
+    id: string,
+    input: Omit<Shift, "id" | "createdAt" | "crewMemberId">,
+  ) => Promise<SaveShiftResult>;
   removeShift: (id: string) => Promise<void>;
+  byId: (id: string) => ShiftWithCalc | undefined;
 }
 
 const ShiftsContext = createContext<ShiftsState | null>(null);
@@ -144,9 +155,36 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   }, []);
 
+  const findDuplicate = useCallback(
+    (
+      crewMemberId: string,
+      input: Omit<Shift, "id" | "createdAt" | "crewMemberId">,
+      ignoreId?: string,
+    ): Shift | undefined => {
+      const startTime = input.stops[0]?.time ?? "";
+      const endTime = input.stops[input.stops.length - 1]?.time ?? "";
+      return shifts.find(
+        (s) =>
+          s.id !== ignoreId &&
+          s.crewMemberId === crewMemberId &&
+          s.date === input.date &&
+          (s.stops[0]?.time ?? "") === startTime &&
+          (s.stops[s.stops.length - 1]?.time ?? "") === endTime,
+      );
+    },
+    [shifts],
+  );
+
   const addShift = useCallback<ShiftsState["addShift"]>(
     async (input) => {
-      if (!user) throw new Error("Sem sessão iniciada");
+      if (!user) return { ok: false, reason: "Sem sessão iniciada" };
+      if (findDuplicate(user.id, input)) {
+        return {
+          ok: false,
+          reason:
+            "Já existe um serviço neste dia com as mesmas horas de início e fim.",
+        };
+      }
       const newShift: Shift = {
         ...input,
         id: newId(),
@@ -154,8 +192,34 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString(),
       };
       await persist([newShift, ...shifts]);
+      return { ok: true, id: newShift.id };
     },
-    [shifts, persist, user],
+    [shifts, persist, user, findDuplicate],
+  );
+
+  const updateShift = useCallback<ShiftsState["updateShift"]>(
+    async (id, input) => {
+      if (!user) return { ok: false, reason: "Sem sessão iniciada" };
+      const existing = shifts.find((s) => s.id === id);
+      if (!existing) return { ok: false, reason: "Serviço não encontrado" };
+      if (existing.crewMemberId !== user.id) {
+        return { ok: false, reason: "Sem permissão para editar este serviço" };
+      }
+      if (findDuplicate(user.id, input, id)) {
+        return {
+          ok: false,
+          reason:
+            "Já existe outro serviço neste dia com as mesmas horas de início e fim.",
+        };
+      }
+      const updated: Shift = {
+        ...existing,
+        ...input,
+      };
+      await persist(shifts.map((s) => (s.id === id ? updated : s)));
+      return { ok: true, id };
+    },
+    [shifts, persist, user, findDuplicate],
   );
 
   const removeShift = useCallback(
@@ -163,6 +227,14 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
       await persist(shifts.filter((s) => s.id !== id));
     },
     [shifts, persist],
+  );
+
+  const byId = useCallback(
+    (id: string) => {
+      const raw = shifts.find((s) => s.id === id);
+      return raw ? decorate(raw) : undefined;
+    },
+    [shifts],
   );
 
   const value = useMemo<ShiftsState>(() => {
@@ -177,9 +249,11 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
       allShifts: decorated,
       isReady,
       addShift,
+      updateShift,
       removeShift,
+      byId,
     };
-  }, [shifts, user, isReady, addShift, removeShift]);
+  }, [shifts, user, isReady, addShift, updateShift, removeShift, byId]);
 
   return (
     <ShiftsContext.Provider value={value}>{children}</ShiftsContext.Provider>
