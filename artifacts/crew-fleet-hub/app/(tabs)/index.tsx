@@ -375,51 +375,53 @@ export default function ShiftsScreen() {
         ) : (
           <View style={{ gap: 12 }}>
             {dayShifts.map((s) => (
-              <ServiceCard key={s.id} shift={s} />
+              <ServiceCard key={s.id} shift={s} today={today} />
             ))}
-            <Pressable
-              onPress={handleToggleDaySwap}
-              style={({ pressed }) => [
-                styles.daySwapToggle,
-                {
-                  backgroundColor: isSwapDay
-                    ? colors.primary + "12"
-                    : colors.card,
-                  borderColor: isSwapDay ? colors.primary : colors.border,
-                  borderRadius: colors.radius,
-                  opacity: pressed ? 0.75 : 1,
-                },
-              ]}
-            >
-              <Feather
-                name={isSwapDay ? "check-square" : "square"}
-                size={18}
-                color={isSwapDay ? colors.primary : colors.mutedForeground}
-              />
-              <Text
-                style={[
-                  styles.daySwapToggleText,
+            {selectedDate >= today ? (
+              <Pressable
+                onPress={handleToggleDaySwap}
+                style={({ pressed }) => [
+                  styles.daySwapToggle,
                   {
-                    color: isSwapDay
-                      ? colors.primary
-                      : colors.mutedForeground,
+                    backgroundColor: isSwapDay
+                      ? colors.primary + "12"
+                      : colors.card,
+                    borderColor: isSwapDay ? colors.primary : colors.border,
+                    borderRadius: colors.radius,
+                    opacity: pressed ? 0.75 : 1,
                   },
                 ]}
               >
-                Disponível para troca
-              </Text>
-              {isSwapDay ? (
+                <Feather
+                  name={isSwapDay ? "check-square" : "square"}
+                  size={18}
+                  color={isSwapDay ? colors.primary : colors.mutedForeground}
+                />
                 <Text
                   style={[
-                    styles.daySwapToggleHint,
-                    { color: colors.primary },
+                    styles.daySwapToggleText,
+                    {
+                      color: isSwapDay
+                        ? colors.primary
+                        : colors.mutedForeground,
+                    },
                   ]}
                 >
-                  · {dayShifts.length}{" "}
-                  {dayShifts.length === 1 ? "serviço" : "serviços"}
+                  Disponível para troca
                 </Text>
-              ) : null}
-            </Pressable>
+                {isSwapDay ? (
+                  <Text
+                    style={[
+                      styles.daySwapToggleHint,
+                      { color: colors.primary },
+                    ]}
+                  >
+                    · {dayShifts.length}{" "}
+                    {dayShifts.length === 1 ? "serviço" : "serviços"}
+                  </Text>
+                ) : null}
+              </Pressable>
+            ) : null}
           </View>
         )}
       </ScrollView>
@@ -435,13 +437,14 @@ function greetingFor(): string {
   return "Boa noite";
 }
 
-function ServiceCard({ shift }: { shift: ShiftWithCalc }) {
+function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) {
   const colors = useColors();
   const router = useRouter();
   const codeLabel = shift.code?.trim() || "Sem código";
   const vehicleLabel = shift.vehicleCode?.trim();
   const affLabel =
     affectationDisplay(shift.affectation, shift.affectationLabel);
+  const isPast = shift.date < today;
 
   return (
     <Pressable
@@ -473,7 +476,7 @@ function ServiceCard({ shift }: { shift: ShiftWithCalc }) {
           </Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          {shift.availableForSwap ? (
+          {shift.availableForSwap && !isPast ? (
             <View
               style={[
                 styles.tag,
