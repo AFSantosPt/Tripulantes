@@ -12,6 +12,9 @@ export const DEFAULT_AFFECTATION_LABELS: Record<AffectationType, string> = {
   extra2: "Extra Normal - Tipo2",
 };
 
+const TZ = "Europe/Lisbon";
+const LOCALE = "pt-PT";
+
 export function affectationDisplay(
   type: AffectationType,
   custom?: string,
@@ -97,9 +100,24 @@ export function calcShiftMinutes(
   };
 }
 
+function lisbonDateParts(date: Date): { y: string; m: string; d: string } {
+  const parts = new Intl.DateTimeFormat(LOCALE, {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  return {
+    y: parts.find((p) => p.type === "year")?.value ?? "",
+    m: parts.find((p) => p.type === "month")?.value ?? "",
+    d: parts.find((p) => p.type === "day")?.value ?? "",
+  };
+}
+
 export function formatDateLong(iso: string): string {
   const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("pt-PT", {
+  return d.toLocaleDateString(LOCALE, {
+    timeZone: TZ,
     weekday: "short",
     day: "2-digit",
     month: "short",
@@ -109,19 +127,23 @@ export function formatDateLong(iso: string): string {
 
 export function formatDayHeadline(iso: string): string {
   const d = new Date(iso + "T00:00:00");
-  const weekday = d.toLocaleDateString("pt-PT", { weekday: "long" });
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const weekday = d.toLocaleDateString(LOCALE, {
+    timeZone: TZ,
+    weekday: "long",
+  });
+  const { d: dd, m: mm } = lisbonDateParts(d);
   return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${dd}/${mm}`;
 }
 
 export function dateYear(iso: string): number {
-  return new Date(iso + "T00:00:00").getFullYear();
+  const { y } = lisbonDateParts(new Date(iso + "T00:00:00"));
+  return Number(y);
 }
 
 export function formatDateShort(iso: string): string {
   const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("pt-PT", {
+  return d.toLocaleDateString(LOCALE, {
+    timeZone: TZ,
     day: "2-digit",
     month: "2-digit",
   });
@@ -138,15 +160,16 @@ export function formatRelative(iso: string): string {
   if (diffH < 24) return `há ${diffH} h`;
   const diffD = Math.round(diffH / 24);
   if (diffD < 7) return `há ${diffD} d`;
-  return d.toLocaleDateString("pt-PT", { day: "2-digit", month: "short" });
+  return d.toLocaleDateString(LOCALE, {
+    timeZone: TZ,
+    day: "2-digit",
+    month: "short",
+  });
 }
 
 export function todayIso(): string {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  const { y, m, d } = lisbonDateParts(new Date());
+  return `${y}-${m}-${d}`;
 }
 
 export function isoMonthKey(iso: string): string {
@@ -156,5 +179,9 @@ export function isoMonthKey(iso: string): string {
 export function monthLabel(monthKey: string): string {
   const [y, m] = monthKey.split("-");
   const d = new Date(Number(y), Number(m) - 1, 1);
-  return d.toLocaleDateString("pt-PT", { month: "long", year: "numeric" });
+  return d.toLocaleDateString(LOCALE, {
+    timeZone: TZ,
+    month: "long",
+    year: "numeric",
+  });
 }
