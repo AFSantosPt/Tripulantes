@@ -63,6 +63,7 @@ interface ShiftsState {
   ) => Promise<SaveShiftResult>;
   removeShift: (id: string) => Promise<void>;
   setSwapAvailable: (id: string, available: boolean) => Promise<void>;
+  setMultipleSwapAvailable: (ids: string[], available: boolean) => Promise<void>;
   byId: (id: string) => ShiftWithCalc | undefined;
 }
 
@@ -242,6 +243,16 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
     [shifts, persist],
   );
 
+  const setMultipleSwapAvailable = useCallback(
+    async (ids: string[], available: boolean) => {
+      const set = new Set(ids);
+      await persist(
+        shifts.map((s) => (set.has(s.id) ? { ...s, availableForSwap: available } : s)),
+      );
+    },
+    [shifts, persist],
+  );
+
   const byId = useCallback(
     (id: string) => {
       const raw = shifts.find((s) => s.id === id);
@@ -265,9 +276,10 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
       updateShift,
       removeShift,
       setSwapAvailable,
+      setMultipleSwapAvailable,
       byId,
     };
-  }, [shifts, user, isReady, addShift, updateShift, removeShift, setSwapAvailable, byId]);
+  }, [shifts, user, isReady, addShift, updateShift, removeShift, setSwapAvailable, setMultipleSwapAvailable, byId]);
 
   return (
     <ShiftsContext.Provider value={value}>{children}</ShiftsContext.Provider>

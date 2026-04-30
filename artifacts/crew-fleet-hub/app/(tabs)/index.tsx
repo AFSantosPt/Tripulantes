@@ -34,7 +34,7 @@ export default function ShiftsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, signOut } = useAuth();
-  const { shifts } = useShifts();
+  const { shifts, setMultipleSwapAvailable } = useShifts();
 
   const today = todayIso();
   const [selectedDate, setSelectedDate] = useState<string>(today);
@@ -99,6 +99,13 @@ export default function ShiftsScreen() {
         .sort((a, b) => a.startMinutes - b.startMinutes),
     [shifts, selectedDate],
   );
+
+  const isSwapDay = dayShifts.length > 0 && dayShifts.every((s) => s.availableForSwap);
+
+  const handleToggleDaySwap = () => {
+    const ids = dayShifts.map((s) => s.id);
+    setMultipleSwapAvailable(ids, !isSwapDay);
+  };
 
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? Math.max(insets.top, 67) : insets.top;
@@ -367,6 +374,49 @@ export default function ShiftsScreen() {
             {dayShifts.map((s) => (
               <ServiceCard key={s.id} shift={s} />
             ))}
+            <Pressable
+              onPress={handleToggleDaySwap}
+              style={({ pressed }) => [
+                styles.daySwapToggle,
+                {
+                  backgroundColor: isSwapDay
+                    ? colors.primary + "12"
+                    : colors.card,
+                  borderColor: isSwapDay ? colors.primary : colors.border,
+                  borderRadius: colors.radius,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <Feather
+                name={isSwapDay ? "check-square" : "square"}
+                size={18}
+                color={isSwapDay ? colors.primary : colors.mutedForeground}
+              />
+              <Text
+                style={[
+                  styles.daySwapToggleText,
+                  {
+                    color: isSwapDay
+                      ? colors.primary
+                      : colors.mutedForeground,
+                  },
+                ]}
+              >
+                Disponível para troca
+              </Text>
+              {isSwapDay ? (
+                <Text
+                  style={[
+                    styles.daySwapToggleHint,
+                    { color: colors.primary },
+                  ]}
+                >
+                  · {dayShifts.length}{" "}
+                  {dayShifts.length === 1 ? "serviço" : "serviços"}
+                </Text>
+              ) : null}
+            </Pressable>
           </View>
         )}
       </ScrollView>
@@ -385,7 +435,6 @@ function greetingFor(): string {
 function ServiceCard({ shift }: { shift: ShiftWithCalc }) {
   const colors = useColors();
   const router = useRouter();
-  const { setSwapAvailable } = useShifts();
   const codeLabel = shift.code?.trim() || "Sem código";
   const vehicleLabel = shift.vehicleCode?.trim();
   const affLabel =
@@ -534,39 +583,6 @@ function ServiceCard({ shift }: { shift: ShiftWithCalc }) {
         </View>
       </View>
 
-      <Pressable
-        onPress={() => setSwapAvailable(shift.id, !shift.availableForSwap)}
-        style={({ pressed }) => [
-          styles.swapToggleRow,
-          {
-            backgroundColor: shift.availableForSwap
-              ? colors.primary + "12"
-              : "transparent",
-            borderTopColor: colors.border,
-            opacity: pressed ? 0.7 : 1,
-          },
-        ]}
-      >
-        <Feather
-          name={shift.availableForSwap ? "check-square" : "square"}
-          size={15}
-          color={
-            shift.availableForSwap ? colors.primary : colors.mutedForeground
-          }
-        />
-        <Text
-          style={[
-            styles.swapToggleText,
-            {
-              color: shift.availableForSwap
-                ? colors.primary
-                : colors.mutedForeground,
-            },
-          ]}
-        >
-          Disponível para troca
-        </Text>
-      </Pressable>
     </Pressable>
   );
 }
@@ -798,15 +814,19 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     marginTop: 2,
   },
-  swapToggleRow: {
+  daySwapToggle: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderTopWidth: 1,
+    paddingVertical: 12,
+    borderWidth: 1,
   },
-  swapToggleText: {
+  daySwapToggleText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  daySwapToggleHint: {
     fontSize: 13,
     fontFamily: "Inter_500Medium",
   },
