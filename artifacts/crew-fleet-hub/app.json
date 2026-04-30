@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Tripulante",
-    "slug": "tripulante",
+    "name": "Tripulantes",
+    "slug": "tripulantes",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "tripulante",
+    "scheme": "tripulantes",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,10 +15,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.tripulante.app"
+      "bundleIdentifier": "com.tripulantes.app"
     },
     "android": {
-      "package": "com.tripulante.app"
+      "package": "com.tripulantes.app"
     },
     "web": {
       "favicon": "./assets/images/icon.png"
