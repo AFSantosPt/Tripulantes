@@ -119,7 +119,7 @@ function decorate(shift: Shift): ShiftWithCalc {
     ...shift,
     startMinutes: startMin,
     endMinutes: safeEnd,
-    ...calcShiftMinutes(startMin, safeEnd),
+    ...calcShiftMinutes(startMin, safeEnd, shift.affectation),
   };
 }
 

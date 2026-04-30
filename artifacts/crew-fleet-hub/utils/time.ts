@@ -89,8 +89,12 @@ export interface ShiftCalc {
 export function calcShiftMinutes(
   startMinutes: number,
   endMinutes: number,
+  affectation?: AffectationType,
 ): ShiftCalc {
   const total = Math.max(0, endMinutes - startMinutes);
+  if (affectation === "extra1" || affectation === "extra2") {
+    return { totalMinutes: total, normalMinutes: 0, extraMinutes: total };
+  }
   const normal = Math.min(total, NORMAL_HOURS_BASE_MINUTES);
   const extra = Math.max(0, total - NORMAL_HOURS_BASE_MINUTES);
   return {
