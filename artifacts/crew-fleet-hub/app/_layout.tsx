@@ -17,6 +17,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BreakdownsProvider } from "@/contexts/BreakdownsContext";
 import { ShiftsProvider } from "@/contexts/ShiftsContext";
+import { SwapsProvider } from "@/contexts/SwapsContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -98,7 +99,9 @@ export default function RootLayout() {
               <AuthProvider>
                 <ShiftsProvider>
                   <BreakdownsProvider>
-                    <RootLayoutNav />
+                    <SwapsProvider>
+                      <RootLayoutNav />
+                    </SwapsProvider>
                   </BreakdownsProvider>
                 </ShiftsProvider>
               </AuthProvider>

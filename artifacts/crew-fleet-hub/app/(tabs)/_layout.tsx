@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { useSwaps } from "@/contexts/SwapsContext";
 import { useColors } from "@/hooks/useColors";
 
 function NativeTabLayout() {
@@ -31,6 +32,10 @@ function NativeTabLayout() {
         />
         <Label>Avarias</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="swaps">
+        <Icon sf={{ default: "arrow.2.squarepath", selected: "arrow.2.squarepath" }} />
+        <Label>Trocas</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="team">
         <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
         <Label>Equipa</Label>
@@ -45,6 +50,11 @@ function ClassicTabLayout() {
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  const { user } = useAuth();
+  const { swapRequests } = useSwaps();
+  const pendingSwapsBadge = swapRequests.filter(
+    (r) => r.offererId === user?.id && r.status === "pending",
+  ).length;
 
   return (
     <Tabs
@@ -106,6 +116,19 @@ function ClassicTabLayout() {
               />
             ) : (
               <Feather name="tool" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="swaps"
+        options={{
+          title: "Trocas",
+          tabBarBadge: pendingSwapsBadge > 0 ? pendingSwapsBadge : undefined,
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="arrow.2.squarepath" tintColor={color} size={24} />
+            ) : (
+              <Feather name="repeat" size={22} color={color} />
             ),
         }}
       />

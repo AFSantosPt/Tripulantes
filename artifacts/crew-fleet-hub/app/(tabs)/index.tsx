@@ -419,29 +419,48 @@ function ServiceCard({ shift }: { shift: ShiftWithCalc }) {
             {codeLabel}
           </Text>
         </View>
-        <View
-          style={[
-            styles.tag,
-            {
-              backgroundColor:
-                shift.affectation === "normal" ? colors.muted : colors.accent,
-              borderRadius: 999,
-            },
-          ]}
-        >
-          <Text
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {shift.availableForSwap ? (
+            <View
+              style={[
+                styles.tag,
+                {
+                  backgroundColor: colors.primary + "18",
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: colors.primary,
+                },
+              ]}
+            >
+              <Text style={[styles.tagLabel, { color: colors.primary }]}>
+                Troca
+              </Text>
+            </View>
+          ) : null}
+          <View
             style={[
-              styles.tagLabel,
+              styles.tag,
               {
-                color:
-                  shift.affectation === "normal"
-                    ? colors.mutedForeground
-                    : colors.accentForeground,
+                backgroundColor:
+                  shift.affectation === "normal" ? colors.muted : colors.accent,
+                borderRadius: 999,
               },
             ]}
           >
-            {affLabel}
-          </Text>
+            <Text
+              style={[
+                styles.tagLabel,
+                {
+                  color:
+                    shift.affectation === "normal"
+                      ? colors.mutedForeground
+                      : colors.accentForeground,
+                },
+              ]}
+            >
+              {affLabel}
+            </Text>
+          </View>
         </View>
       </View>
 

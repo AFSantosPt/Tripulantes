@@ -35,6 +35,7 @@ export interface Shift {
   affectationLabel?: string;
   stops: ShiftStop[];
   notes?: string;
+  availableForSwap?: boolean;
   createdAt: string;
 }
 
@@ -61,6 +62,7 @@ interface ShiftsState {
     input: Omit<Shift, "id" | "createdAt" | "crewMemberId">,
   ) => Promise<SaveShiftResult>;
   removeShift: (id: string) => Promise<void>;
+  setSwapAvailable: (id: string, available: boolean) => Promise<void>;
   byId: (id: string) => ShiftWithCalc | undefined;
 }
 
@@ -81,6 +83,7 @@ function migrateLoadedShift(raw: any): Shift {
         time: String(s.time ?? "00:00"),
       })),
       notes: raw.notes ?? undefined,
+      availableForSwap: raw.availableForSwap ?? false,
       createdAt: raw.createdAt ?? new Date().toISOString(),
     };
   }
@@ -99,6 +102,7 @@ function migrateLoadedShift(raw: any): Shift {
       { location: "", time: formatMinutesToTime(em) },
     ],
     notes: raw?.notes ?? undefined,
+    availableForSwap: raw?.availableForSwap ?? false,
     createdAt: raw?.createdAt ?? new Date().toISOString(),
   };
 }
@@ -229,6 +233,15 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
     [shifts, persist],
   );
 
+  const setSwapAvailable = useCallback(
+    async (id: string, available: boolean) => {
+      await persist(
+        shifts.map((s) => (s.id === id ? { ...s, availableForSwap: available } : s)),
+      );
+    },
+    [shifts, persist],
+  );
+
   const byId = useCallback(
     (id: string) => {
       const raw = shifts.find((s) => s.id === id);
@@ -251,9 +264,10 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
       addShift,
       updateShift,
       removeShift,
+      setSwapAvailable,
       byId,
     };
-  }, [shifts, user, isReady, addShift, updateShift, removeShift, byId]);
+  }, [shifts, user, isReady, addShift, updateShift, removeShift, setSwapAvailable, byId]);
 
   return (
     <ShiftsContext.Provider value={value}>{children}</ShiftsContext.Provider>
