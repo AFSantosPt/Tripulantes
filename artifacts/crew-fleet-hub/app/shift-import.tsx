@@ -1,7 +1,9 @@
 import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,7 +16,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { TextField } from "@/components/TextField";
 import { useShifts } from "@/contexts/ShiftsContext";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -51,6 +52,32 @@ Martim Moniz 15:15
 Calvário 17:30
 `;
 
+function getApiBase(): string {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  const domain = process.env["EXPO_PUBLIC_DOMAIN"];
+  if (domain) return `https://${domain}`;
+  return "";
+}
+
+async function ocrImage(
+  base64: string,
+  mimeType: string,
+): Promise<{ text: string; found: boolean }> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/ocr/shift`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image: base64, mimeType }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as any).error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 export default function ShiftImportScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -67,6 +94,8 @@ export default function ShiftImportScreen() {
   const [selectedIds, setSelectedIds] = useState<Record<number, boolean>>({});
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
+  const [ocrLoading, setOcrLoading] = useState<boolean>(false);
+  const [ocrError, setOcrError] = useState<string | null>(null);
 
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? Math.max(insets.top, 67) : insets.top;
@@ -99,6 +128,47 @@ export default function ShiftImportScreen() {
     setAnalyzed(null);
     setSelectedIds({});
     setResultMsg(null);
+    setOcrError(null);
+  };
+
+  const handlePickImage = async () => {
+    setOcrError(null);
+    try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        setOcrError("Permissão de acesso à galeria negada.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: "images",
+        allowsEditing: false,
+        quality: 0.85,
+        base64: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      if (!asset.base64) {
+        setOcrError("Não foi possível ler a imagem.");
+        return;
+      }
+      setOcrLoading(true);
+      const mime = asset.mimeType ?? "image/jpeg";
+      const { text: extracted, found } = await ocrImage(asset.base64, mime);
+      if (!found || !extracted.trim()) {
+        setOcrError(
+          "Não foi possível reconhecer serviços na imagem. Tenta com uma imagem mais nítida ou cola o texto manualmente.",
+        );
+        return;
+      }
+      setText(extracted.trim());
+      setAnalyzed(null);
+      setSelectedIds({});
+    } catch (e: any) {
+      setOcrError(`Erro: ${e?.message ?? "falha desconhecida"}`);
+    } finally {
+      setOcrLoading(false);
+    }
   };
 
   const toggle = (idx: number) => {
@@ -197,14 +267,72 @@ export default function ShiftImportScreen() {
             <Text
               style={[styles.infoBannerText, { color: colors.foreground }]}
             >
-              Cola dados do portal da Carris (JSON, tabela ou texto). A app
-              tenta reconhecer o formato e mostra uma pré-visualização.
+              Seleciona uma imagem do portal para reconhecimento automático, ou
+              cola o texto diretamente (JSON, tabela ou texto livre).
             </Text>
           </View>
 
-          <Text style={[styles.label, { color: colors.foreground }]}>
-            Dados a importar
-          </Text>
+          <Pressable
+            onPress={handlePickImage}
+            disabled={ocrLoading}
+            style={({ pressed }) => [
+              styles.imagePickBtn,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.primary,
+                borderRadius: colors.radius,
+                opacity: pressed || ocrLoading ? 0.75 : 1,
+              },
+            ]}
+          >
+            {ocrLoading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Feather name="image" size={18} color={colors.primary} />
+            )}
+            <Text style={[styles.imagePickBtnText, { color: colors.primary }]}>
+              {ocrLoading
+                ? "A reconhecer imagem…"
+                : "Selecionar imagem / screenshot"}
+            </Text>
+          </Pressable>
+
+          {ocrError ? (
+            <View
+              style={[
+                styles.errorBanner,
+                {
+                  backgroundColor: colors.destructive + "15",
+                  borderColor: colors.destructive,
+                  borderRadius: colors.radius,
+                },
+              ]}
+            >
+              <Feather
+                name="alert-triangle"
+                size={14}
+                color={colors.destructive}
+              />
+              <Text
+                style={[styles.errorText, { color: colors.destructive }]}
+              >
+                {ocrError}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.orRow}>
+            <View
+              style={[styles.orLine, { backgroundColor: colors.border }]}
+            />
+            <Text style={[styles.orText, { color: colors.mutedForeground }]}>
+              ou cola o texto
+            </Text>
+            <View
+              style={[styles.orLine, { backgroundColor: colors.border }]}
+            />
+          </View>
+
           <TextInput
             value={text}
             onChangeText={setText}
@@ -557,6 +685,45 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     lineHeight: 18,
   },
+  imagePickBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 14,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+  },
+  imagePickBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    padding: 12,
+    borderWidth: 1,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    lineHeight: 18,
+  },
+  orRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+  },
+  orText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
   label: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
@@ -565,7 +732,7 @@ const styles = StyleSheet.create({
   },
   textarea: {
     borderWidth: 1,
-    minHeight: 200,
+    minHeight: 160,
     padding: 14,
     fontSize: 13,
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
