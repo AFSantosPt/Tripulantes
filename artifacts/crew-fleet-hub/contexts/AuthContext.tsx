@@ -14,17 +14,19 @@ const SESSION_KEY = "@tripulante-gestao/session/v2";
 
 export type AccountStatus = "pending" | "active";
 
-export type CrewCategory = "guarda-freio" | "motorista" | "outro";
+export type CrewCategory = "guarda-freio" | "motorista" | "ascensor" | "outro";
 
 export const ALL_CREW_CATEGORIES: CrewCategory[] = [
   "guarda-freio",
   "motorista",
+  "ascensor",
   "outro",
 ];
 
 export const CREW_CATEGORY_LABELS: Record<CrewCategory, string> = {
   "guarda-freio": "Eléctricos",
   motorista: "Autocarros",
+  ascensor: "Ascensores",
   outro: "Outro",
 };
 

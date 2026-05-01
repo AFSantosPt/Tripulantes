@@ -22,6 +22,7 @@ import {
   BreakdownPhoto,
   Confirmation,
   REQUIRED_CONFIRMATIONS_COUNT,
+  VEHICLE_ICON,
   VEHICLE_LABELS,
   useBreakdowns,
 } from "@/contexts/BreakdownsContext";
@@ -266,7 +267,7 @@ export default function BreakdownDetailScreen() {
               ]}
             >
               <Feather
-                name={breakdown.vehicleKind === "eletrico" ? "zap" : "truck"}
+                name={VEHICLE_ICON[breakdown.vehicleKind] as any}
                 size={12}
                 color="#FFFFFF"
               />

@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Breakdown,
   REQUIRED_CONFIRMATIONS_COUNT,
+  VEHICLE_ICON,
   VEHICLE_LABELS,
   useBreakdowns,
 } from "@/contexts/BreakdownsContext";
@@ -212,18 +213,20 @@ function BreakdownCard({
               backgroundColor:
                 breakdown.vehicleKind === "eletrico"
                   ? "#1F4F7A"
-                  : colors.secondary,
+                  : breakdown.vehicleKind === "ascensor"
+                    ? "#7B5A2D"
+                    : colors.secondary,
               borderRadius: 999,
             },
           ]}
         >
           <Feather
-            name={breakdown.vehicleKind === "eletrico" ? "zap" : "truck"}
+            name={VEHICLE_ICON[breakdown.vehicleKind] as any}
             size={12}
             color={
-              breakdown.vehicleKind === "eletrico"
-                ? "#FFFFFF"
-                : colors.foreground
+              breakdown.vehicleKind === "autocarro"
+                ? colors.foreground
+                : "#FFFFFF"
             }
           />
           <Text
@@ -231,9 +234,9 @@ function BreakdownCard({
               styles.kindLabel,
               {
                 color:
-                  breakdown.vehicleKind === "eletrico"
-                    ? "#FFFFFF"
-                    : colors.foreground,
+                  breakdown.vehicleKind === "autocarro"
+                    ? colors.foreground
+                    : "#FFFFFF",
               },
             ]}
           >

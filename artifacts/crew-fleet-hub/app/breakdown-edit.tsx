@@ -22,6 +22,7 @@ import { useColors } from "@/hooks/useColors";
 const VEHICLE_OPTIONS: { value: VehicleKind; label: string }[] = [
   { value: "autocarro", label: "Autocarros" },
   { value: "eletrico", label: "Eléctricos" },
+  { value: "ascensor", label: "Ascensores" },
 ];
 
 export default function EditBreakdownScreen() {

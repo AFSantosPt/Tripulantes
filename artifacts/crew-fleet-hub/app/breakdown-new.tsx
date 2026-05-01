@@ -22,7 +22,8 @@ import { useColors } from "@/hooks/useColors";
 const CATEGORY_VEHICLE_MAP: Record<string, VehicleKind[]> = {
   motorista: ["autocarro"],
   "guarda-freio": ["eletrico"],
-  outro: ["autocarro", "eletrico"],
+  ascensor: ["ascensor"],
+  outro: ["autocarro", "eletrico", "ascensor"],
 };
 
 function vehicleOptionsForCategories(categories: string[]): { value: VehicleKind; label: string }[] {
@@ -30,10 +31,11 @@ function vehicleOptionsForCategories(categories: string[]): { value: VehicleKind
   for (const cat of categories) {
     for (const kind of (CATEGORY_VEHICLE_MAP[cat] ?? [])) kindSet.add(kind);
   }
-  if (kindSet.size === 0) { kindSet.add("autocarro"); kindSet.add("eletrico"); }
+  if (kindSet.size === 0) { kindSet.add("autocarro"); kindSet.add("eletrico"); kindSet.add("ascensor"); }
   const all: { value: VehicleKind; label: string }[] = [
     { value: "autocarro", label: "Autocarros" },
     { value: "eletrico", label: "Eléctricos" },
+    { value: "ascensor", label: "Ascensores" },
   ];
   return all.filter((o) => kindSet.has(o.value));
 }

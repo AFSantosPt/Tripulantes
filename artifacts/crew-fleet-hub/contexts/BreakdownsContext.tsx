@@ -16,11 +16,18 @@ const REQUIRED_CONFIRMATIONS = 2;
 export const REQUIRED_CONFIRMATIONS_COUNT = REQUIRED_CONFIRMATIONS;
 const POLL_INTERVAL_MS = 30000;
 
-export type VehicleKind = "eletrico" | "autocarro";
+export type VehicleKind = "eletrico" | "autocarro" | "ascensor";
 
 export const VEHICLE_LABELS: Record<VehicleKind, string> = {
   eletrico: "Eléctricos",
   autocarro: "Autocarros",
+  ascensor: "Ascensores",
+};
+
+export const VEHICLE_ICON: Record<VehicleKind, string> = {
+  eletrico: "zap",
+  autocarro: "truck",
+  ascensor: "arrow-up",
 };
 
 export interface Confirmation {
