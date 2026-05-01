@@ -579,10 +579,23 @@ export default function SwapsScreen() {
 
   const availableDayGroups = useMemo(() => {
     if (!user) return [];
+
+    const myWorkDates = new Set(
+      allShifts
+        .filter(
+          (s) =>
+            s.crewMemberId === user.id &&
+            s.stops != null &&
+            s.stops.length >= 2,
+        )
+        .map((s) => s.date),
+    );
+
     const filtered = allShifts.filter((s) => {
       if (!s.availableForSwap) return false;
       if (s.date < today) return false;
       if (s.crewMemberId === user.id) return false;
+      if (!myWorkDates.has(s.date)) return false;
       const offerer = members.find((m) => m.id === s.crewMemberId);
       if (!offerer) return false;
       if (!categoriesCompatible(user.categories ?? [], offerer.categories ?? []))
@@ -660,8 +673,7 @@ export default function SwapsScreen() {
           Trocas
         </Text>
         <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
-          Serviços disponíveis para troca entre tripulantes da mesma categoria.
-          Entradas expiram automaticamente após o dia do serviço.
+          Só aparecem trocas em dias em que ambos têm serviço. Entradas expiram automaticamente após o dia do serviço.
         </Text>
 
         <SectionHeader
@@ -685,7 +697,7 @@ export default function SwapsScreen() {
 
         <SectionHeader title="Disponíveis para mim" />
         {availableDayGroups.length === 0 ? (
-          <EmptySection label="Nenhum serviço disponível para troca com a tua categoria." />
+          <EmptySection label="Nenhum serviço disponível. Só aparecem dias em que tens e o colega também tem serviço." />
         ) : (
           <View style={{ gap: 12 }}>
             {availableDayGroups.map((group) => {
