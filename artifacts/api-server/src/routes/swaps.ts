@@ -1,6 +1,7 @@
 import { Router } from "express";
 import fs from "fs/promises";
 import path from "path";
+import { broadcast } from "../lib/sse";
 import { newId } from "../lib/id";
 import { readMembers } from "../lib/store";
 
@@ -114,6 +115,7 @@ router.post("/swaps", async (req, res) => {
     createdAt: new Date().toISOString(),
   };
   await writeSwaps([...items, req2]);
+  broadcast("swaps");
   res.status(201).json({ swapRequest: req2 });
 });
 
@@ -129,6 +131,7 @@ router.post("/swaps/:id/confirm", async (req, res) => {
   if (target.status !== "pending") { res.status(400).json({ error: "Pedido já processado" }); return; }
   const updated = { ...target, status: "confirmed" as const };
   await writeSwaps(items.map((r) => (r.id === req.params.id ? updated : r)));
+  broadcast("swaps");
   res.json({ swapRequest: updated });
 });
 
@@ -144,6 +147,7 @@ router.post("/swaps/:id/reject", async (req, res) => {
   if (target.status !== "pending") { res.status(400).json({ error: "Pedido já processado" }); return; }
   const updated = { ...target, status: "rejected" as const };
   await writeSwaps(items.map((r) => (r.id === req.params.id ? updated : r)));
+  broadcast("swaps");
   res.json({ swapRequest: updated });
 });
 
@@ -159,6 +163,7 @@ router.delete("/swaps/:id", async (req, res) => {
     res.status(403).json({ error: "Sem permissão" }); return;
   }
   await writeSwaps(items.filter((r) => r.id !== req.params.id));
+  broadcast("swaps");
   res.json({ ok: true });
 });
 

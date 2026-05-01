@@ -9,6 +9,7 @@ import React, {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/utils/apiClient";
+import { useServerEvents } from "@/hooks/useServerEvents";
 
 export const BREAKDOWN_PHOTO_LIFETIME_DAYS = 14;
 export const BREAKDOWN_MAX_PHOTOS = 3;
@@ -100,6 +101,8 @@ export function BreakdownsProvider({
     const interval = setInterval(fetchBreakdowns, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [user, fetchBreakdowns]);
+
+  useServerEvents("breakdowns", fetchBreakdowns);
 
   const reportBreakdown = useCallback<BreakdownsState["reportBreakdown"]>(
     async (input) => {

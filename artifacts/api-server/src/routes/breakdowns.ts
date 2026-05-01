@@ -1,6 +1,7 @@
 import { Router } from "express";
 import fs from "fs/promises";
 import path from "path";
+import { broadcast } from "../lib/sse";
 import { newId } from "../lib/id";
 import { readMembers } from "../lib/store";
 
@@ -103,6 +104,7 @@ router.post("/breakdowns", async (req, res) => {
   };
   const items = await readBreakdowns();
   await writeBreakdowns([created, ...items]);
+  broadcast("breakdowns");
   res.status(201).json({ breakdown: created });
 });
 
@@ -131,6 +133,7 @@ router.post("/breakdowns/:id/confirm", async (req, res) => {
     ],
   };
   await writeBreakdowns(items.map((b) => (b.id === req.params.id ? updated : b)));
+  broadcast("breakdowns");
   res.json({ breakdown: updated });
 });
 
@@ -146,6 +149,7 @@ router.delete("/breakdowns/:id", async (req, res) => {
     res.status(403).json({ error: "Sem permissão" }); return;
   }
   await writeBreakdowns(items.filter((b) => b.id !== req.params.id));
+  broadcast("breakdowns");
   res.json({ ok: true });
 });
 
@@ -168,6 +172,7 @@ router.post("/breakdowns/:id/photos", async (req, res) => {
   };
   const updated = { ...target, photos: [photo, ...target.photos] };
   await writeBreakdowns(items.map((b) => (b.id === req.params.id ? updated : b)));
+  broadcast("breakdowns");
   res.json({ breakdown: updated });
 });
 
@@ -181,6 +186,7 @@ router.delete("/breakdowns/:id/photos/:photoId", async (req, res) => {
   if (!target) { res.status(404).json({ error: "Avaria não encontrada" }); return; }
   const updated = { ...target, photos: target.photos.filter((p) => p.id !== req.params.photoId) };
   await writeBreakdowns(items.map((b) => (b.id === req.params.id ? updated : b)));
+  broadcast("breakdowns");
   res.json({ breakdown: updated });
 });
 

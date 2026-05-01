@@ -1,6 +1,7 @@
 import { Router } from "express";
 import fs from "fs/promises";
 import path from "path";
+import { broadcast } from "../lib/sse";
 import { newId } from "../lib/id";
 import { readMembers } from "../lib/store";
 
@@ -116,6 +117,7 @@ router.post("/shifts", async (req, res) => {
     createdAt: new Date().toISOString(),
   };
   await writeShifts([created, ...all]);
+  broadcast("shifts");
   res.status(201).json({ shift: created });
 });
 
@@ -160,6 +162,7 @@ router.put("/shifts/:id", async (req, res) => {
 
   const updated: Shift = { ...existing, ...body, id: existing.id, crewMemberId: existing.crewMemberId, createdAt: existing.createdAt };
   await writeShifts(all.map((s) => (s.id === req.params.id ? updated : s)));
+  broadcast("shifts");
   res.json({ shift: updated });
 });
 
@@ -176,6 +179,7 @@ router.delete("/shifts/:id", async (req, res) => {
     res.status(403).json({ error: "Sem permissão" }); return;
   }
   await writeShifts(all.filter((s) => s.id !== req.params.id));
+  broadcast("shifts");
   res.json({ ok: true });
 });
 
@@ -194,6 +198,7 @@ router.patch("/shifts/:id/swap-available", async (req, res) => {
   const available = Boolean(req.body?.available);
   const updated = { ...existing, availableForSwap: available };
   await writeShifts(all.map((s) => (s.id === req.params.id ? updated : s)));
+  broadcast("shifts");
   res.json({ shift: updated });
 });
 
@@ -213,6 +218,7 @@ router.post("/shifts/swap-available/bulk", async (req, res) => {
       : s,
   );
   await writeShifts(next);
+  broadcast("shifts");
   res.json({ ok: true });
 });
 

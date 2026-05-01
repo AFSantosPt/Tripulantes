@@ -10,6 +10,7 @@ import React, {
 import { CrewCategory, useAuth } from "@/contexts/AuthContext";
 import { ShiftStop, ShiftWithCalc } from "@/contexts/ShiftsContext";
 import { apiFetch } from "@/utils/apiClient";
+import { useServerEvents } from "@/hooks/useServerEvents";
 import { todayIso } from "@/utils/time";
 
 const POLL_INTERVAL_MS = 30000;
@@ -89,6 +90,8 @@ export function SwapsProvider({ children }: { children: React.ReactNode }) {
     const interval = setInterval(fetchSwaps, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [user, fetchSwaps]);
+
+  useServerEvents("swaps", fetchSwaps);
 
   const requestSwap = useCallback(
     async ({

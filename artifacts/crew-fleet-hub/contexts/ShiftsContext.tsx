@@ -11,6 +11,7 @@ import React, {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/utils/apiClient";
+import { useServerEvents } from "@/hooks/useServerEvents";
 
 import {
   ABSENCE_TYPES,
@@ -207,6 +208,8 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
     const interval = setInterval(fetchShifts, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [user, fetchShifts]);
+
+  useServerEvents("shifts", fetchShifts);
 
   const addShift = useCallback<ShiftsState["addShift"]>(
     async (input) => {
