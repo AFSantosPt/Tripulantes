@@ -407,7 +407,9 @@ export default function TeamScreen() {
                   Contrato telefónico
                 </Text>
                 <Text style={[styles.passwordMeta, { color: colors.mutedForeground }]}>
-                  {user?.phone ?? "Não definido"}
+                  {user?.phone
+                    ? `••• ••• ${user.phone.replace(/\s/g, "").slice(-3)}`
+                    : "Não definido"}
                 </Text>
               </View>
               <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
