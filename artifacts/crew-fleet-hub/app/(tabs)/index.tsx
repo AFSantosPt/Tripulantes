@@ -17,6 +17,7 @@ import { MonthCalendar } from "@/components/MonthCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useShifts, ShiftWithCalc } from "@/contexts/ShiftsContext";
 import { VEHICLE_LABELS, VehicleKind } from "@/contexts/BreakdownsContext";
+import { FOLGA_GROUPS, FolgaGroup, getFolgaDaysForYear } from "@/utils/folgaSchedule";
 import { useColors } from "@/hooks/useColors";
 import {
   affectationDisplay,
@@ -97,6 +98,15 @@ export default function ShiftsScreen() {
     () => Array.from(new Set(shifts.map((s) => s.date))),
     [shifts],
   );
+
+  const folgaDates = useMemo(() => {
+    const group = user?.folgaGroup;
+    if (!group || !FOLGA_GROUPS.includes(group as FolgaGroup)) return [];
+    return [
+      ...getFolgaDaysForYear(group as FolgaGroup, 2026),
+      ...getFolgaDaysForYear(group as FolgaGroup, 2027),
+    ];
+  }, [user?.folgaGroup]);
 
   const dayShifts = useMemo(
     () =>
@@ -323,6 +333,7 @@ export default function ShiftsScreen() {
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           markedDates={markedDates}
+          folgaDates={folgaDates}
           todayIso={today}
         />
 

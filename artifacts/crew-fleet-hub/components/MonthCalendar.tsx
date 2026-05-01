@@ -13,6 +13,7 @@ interface MonthCalendarProps {
   selectedDate: string;
   onSelectDate: (iso: string) => void;
   markedDates?: string[];
+  folgaDates?: string[];
   todayIso: string;
 }
 
@@ -98,10 +99,14 @@ function buildCells(year: number, month: number): Cell[] {
   return cells;
 }
 
+const FOLGA_BG = "#F59E0B18";
+const FOLGA_DOT = "#F59E0B";
+
 export function MonthCalendar({
   selectedDate,
   onSelectDate,
   markedDates = [],
+  folgaDates = [],
   todayIso,
 }: MonthCalendarProps) {
   const colors = useColors();
@@ -122,6 +127,7 @@ export function MonthCalendar({
   );
 
   const markedSet = useMemo(() => new Set(markedDates), [markedDates]);
+  const folgaSet = useMemo(() => new Set(folgaDates), [folgaDates]);
 
   const goPrev = () => {
     setView((v) => {
@@ -189,6 +195,7 @@ export function MonthCalendar({
           const isSelected = c.iso === selectedDate;
           const isToday = c.iso === todayIso;
           const hasMark = markedSet.has(c.iso);
+          const isFolga = folgaSet.has(c.iso);
           const dim = !c.inMonth;
           return (
             <Pressable
@@ -202,6 +209,11 @@ export function MonthCalendar({
               <View
                 style={[
                   styles.cellInner,
+                  !isSelected && isFolga && c.inMonth && {
+                    backgroundColor: FOLGA_BG,
+                    borderWidth: 1,
+                    borderColor: FOLGA_DOT + "55",
+                  },
                   isSelected && {
                     backgroundColor: colors.accent,
                   },
@@ -217,13 +229,15 @@ export function MonthCalendar({
                     {
                       color: isSelected
                         ? colors.accentForeground
-                        : dim
-                          ? colors.mutedForeground
-                          : colors.foreground,
+                        : isFolga && c.inMonth
+                          ? FOLGA_DOT
+                          : dim
+                            ? colors.mutedForeground
+                            : colors.foreground,
                       opacity: dim ? 0.4 : 1,
                       fontFamily: isSelected
                         ? "Inter_700Bold"
-                        : isToday
+                        : isToday || (isFolga && c.inMonth)
                           ? "Inter_700Bold"
                           : "Inter_500Medium",
                     },
@@ -231,14 +245,14 @@ export function MonthCalendar({
                 >
                   {c.day}
                 </Text>
-                {hasMark ? (
+                {hasMark || (isFolga && isSelected) ? (
                   <View
                     style={[
                       styles.dot,
                       {
-                        backgroundColor: isSelected
-                          ? colors.accentForeground
-                          : colors.primary,
+                        backgroundColor: hasMark
+                          ? (isSelected ? colors.accentForeground : colors.primary)
+                          : FOLGA_DOT,
                       },
                     ]}
                   />

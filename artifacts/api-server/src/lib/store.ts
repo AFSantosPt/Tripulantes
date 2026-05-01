@@ -21,6 +21,7 @@ export interface CrewMember {
   isAdmin: boolean;
   categories: CrewCategory[];
   categoryOtherLabel?: string;
+  folgaGroup?: string;
   createdAt: string;
   approvedAt?: string;
   approvedById?: string;
@@ -37,6 +38,7 @@ function rowToMember(row: any): CrewMember {
     isAdmin: row.is_admin,
     categories: row.categories ?? [],
     categoryOtherLabel: row.category_other_label ?? undefined,
+    folgaGroup: row.folga_group ?? undefined,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
     approvedAt: row.approved_at ? (row.approved_at instanceof Date ? row.approved_at.toISOString() : String(row.approved_at)) : undefined,
     approvedById: row.approved_by_id ?? undefined,
@@ -80,6 +82,7 @@ export async function updateMember(id: string, fields: Partial<Omit<CrewMember, 
   if (fields.nickname !== undefined)           { sets.push(`nickname=$${idx++}`);                vals.push(fields.nickname ?? null); }
   if (fields.categories !== undefined)         { sets.push(`categories=$${idx++}`);              vals.push(fields.categories); }
   if (fields.categoryOtherLabel !== undefined) { sets.push(`category_other_label=$${idx++}`);     vals.push(fields.categoryOtherLabel); }
+  if (fields.folgaGroup !== undefined)         { sets.push(`folga_group=$${idx++}`);               vals.push(fields.folgaGroup ?? null); }
   if (fields.approvedAt !== undefined)         { sets.push(`approved_at=$${idx++}`);              vals.push(fields.approvedAt); }
   if (fields.approvedById !== undefined){ sets.push(`approved_by_id=$${idx++}`); vals.push(fields.approvedById); }
   if (!sets.length) return findMemberById(id);

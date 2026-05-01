@@ -346,6 +346,51 @@ export default function TeamScreen() {
                 color={colors.mutedForeground}
               />
             </Pressable>
+            <Pressable
+              onPress={() => router.push("/folga-group")}
+              style={({ pressed }) => [
+                styles.passwordRow,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  borderRadius: colors.radius,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.passwordIcon,
+                  { backgroundColor: "#F59E0B20" },
+                ]}
+              >
+                <Feather
+                  name="calendar"
+                  size={16}
+                  color="#F59E0B"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[styles.passwordTitle, { color: colors.foreground }]}
+                >
+                  Grupo de folga
+                </Text>
+                <Text
+                  style={[
+                    styles.passwordMeta,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  {user?.folgaGroup ?? "Não definido"}
+                </Text>
+              </View>
+              <Feather
+                name="chevron-right"
+                size={20}
+                color={colors.mutedForeground}
+              />
+            </Pressable>
             {!isAdmin ? (
               <View
                 style={[

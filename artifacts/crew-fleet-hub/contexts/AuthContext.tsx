@@ -35,6 +35,7 @@ export interface CrewMember {
   name: string;
   crewId: string;
   nickname?: string;
+  folgaGroup?: string;
   status: AccountStatus;
   isAdmin: boolean;
   categories: CrewCategory[];
@@ -81,6 +82,7 @@ interface AuthState {
     next: string;
   }) => Promise<{ ok: true } | { ok: false; error: string }>;
   updateNickname: (nickname: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  updateFolgaGroup: (group: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   updateName: (name: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   adminUpdateName: (memberId: string, name: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   refreshMembers: () => Promise<void>;
@@ -351,6 +353,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user],
   );
 
+  const updateFolgaGroup = useCallback<AuthState["updateFolgaGroup"]>(
+    async (group) => {
+      if (!user) return { ok: false, error: "Sessão inválida" };
+      try {
+        const res = await apiFetch("/api/auth/folga-group", {
+          method: "PATCH",
+          memberId: user.id,
+          body: JSON.stringify({ folgaGroup: group }),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, error: data.error ?? "Erro" };
+        setUser(data.member as CrewMember);
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
+        return { ok: false, error: msg };
+      }
+    },
+    [user],
+  );
+
   const updateName = useCallback<AuthState["updateName"]>(
     async (name) => {
       if (!user) return { ok: false, error: "Sessão inválida" };
@@ -415,6 +438,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updateCategories,
       changePassword,
       updateNickname,
+      updateFolgaGroup,
       updateName,
       adminUpdateName,
       refreshMembers,
@@ -434,6 +458,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateCategories,
     changePassword,
     updateNickname,
+    updateFolgaGroup,
     updateName,
     adminUpdateName,
     refreshMembers,
