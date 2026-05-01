@@ -82,9 +82,12 @@ router.post("/breakdowns/:id/confirm", async (req, res) => {
 
 router.patch("/breakdowns/:id", async (req, res) => {
   const member = await requireActiveMember(req.headers["x-member-id"] as string);
-  if (!member || !member.isAdmin) { res.status(403).json({ error: "Só o administrador pode editar avarias" }); return; }
+  if (!member) { res.status(403).json({ error: "Sem permissão" }); return; }
   const existing = await pool.query("SELECT * FROM breakdowns WHERE id=$1", [req.params.id]);
   if (!existing.rows[0]) { res.status(404).json({ error: "Avaria não encontrada" }); return; }
+  if (existing.rows[0].reported_by_id !== member.id && !member.isAdmin) {
+    res.status(403).json({ error: "Só o autor ou o administrador pode editar esta avaria" }); return;
+  }
   const { vehicleKind, fleetNumber, description } = req.body ?? {};
   if (!vehicleKind || !fleetNumber?.trim() || !description?.trim()) {
     res.status(400).json({ error: "Campos obrigatórios em falta" }); return;

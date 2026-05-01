@@ -50,7 +50,10 @@ export default function EditBreakdownScreen() {
   const topPad = isWeb ? Math.max(insets.top, 67) : insets.top;
   const bottomPad = isWeb ? Math.max(insets.bottom, 34) : insets.bottom + 16;
 
-  if (!breakdown || !user?.isAdmin) {
+  const isReporter = breakdown?.reportedById === user?.id;
+  const canEdit = isReporter || user?.isAdmin;
+
+  if (!breakdown || !canEdit) {
     return (
       <View
         style={[
@@ -146,11 +149,17 @@ export default function EditBreakdownScreen() {
               },
             ]}
           >
-            <Feather name="shield" size={16} color={colors.mutedForeground} />
+            <Feather
+              name={user?.isAdmin && !isReporter ? "shield" : "edit-2"}
+              size={16}
+              color={colors.mutedForeground}
+            />
             <Text
               style={[styles.adminBannerText, { color: colors.foreground }]}
             >
-              A editar como administrador
+              {user?.isAdmin && !isReporter
+                ? "A editar como administrador"
+                : "A editar a tua avaria"}
             </Text>
           </View>
 

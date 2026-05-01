@@ -208,7 +208,7 @@ export default function BreakdownDetailScreen() {
             <Feather name="arrow-left" size={20} color={colors.foreground} />
           </Pressable>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            {user?.isAdmin ? (
+            {(isReporter || user?.isAdmin) ? (
               <Pressable
                 onPress={() => router.push(`/breakdown-edit?id=${breakdown.id}`)}
                 style={({ pressed }) => [
