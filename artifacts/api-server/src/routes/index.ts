@@ -3,6 +3,7 @@ import authRouter from "./auth";
 import breakdownsRouter from "./breakdowns";
 import eventsRouter from "./events";
 import healthRouter from "./health";
+import noticesRouter from "./notices";
 import ocrRouter from "./ocr";
 import shiftsRouter from "./shifts";
 import swapsRouter from "./swaps";
@@ -16,5 +17,6 @@ router.use(eventsRouter);
 router.use(breakdownsRouter);
 router.use(swapsRouter);
 router.use(shiftsRouter);
+router.use(noticesRouter);
 
 export default router;

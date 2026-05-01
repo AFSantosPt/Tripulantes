@@ -1,6 +1,6 @@
 import type { Response } from "express";
 
-export type SseEvent = "shifts" | "breakdowns" | "swaps" | "members";
+export type SseEvent = "shifts" | "breakdowns" | "swaps" | "members" | "notices";
 
 const clients = new Set<Response>();
 

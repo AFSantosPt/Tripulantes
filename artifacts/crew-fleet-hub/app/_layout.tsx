@@ -16,6 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BreakdownsProvider } from "@/contexts/BreakdownsContext";
+import { NoticesProvider } from "@/contexts/NoticesContext";
 import { ShiftsProvider } from "@/contexts/ShiftsContext";
 import { SwapsProvider } from "@/contexts/SwapsContext";
 
@@ -100,7 +101,9 @@ export default function RootLayout() {
                 <ShiftsProvider>
                   <BreakdownsProvider>
                     <SwapsProvider>
-                      <RootLayoutNav />
+                      <NoticesProvider>
+                        <RootLayoutNav />
+                      </NoticesProvider>
                     </SwapsProvider>
                   </BreakdownsProvider>
                 </ShiftsProvider>

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotices } from "@/contexts/NoticesContext";
 import { useSwaps } from "@/contexts/SwapsContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -40,6 +41,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
         <Label>Equipa</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="notices">
+        <Icon sf={{ default: "bell", selected: "bell.fill" }} />
+        <Label>Avisos</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
@@ -52,6 +57,7 @@ function ClassicTabLayout() {
   const isWeb = Platform.OS === "web";
   const { user } = useAuth();
   const { swapRequests } = useSwaps();
+  const { unreadCount: noticesUnread } = useNotices();
   const pendingSwapsBadge = swapRequests.filter(
     (r) => r.offererId === user?.id && r.status === "pending",
   ).length;
@@ -141,6 +147,19 @@ function ClassicTabLayout() {
               <SymbolView name="person.2" tintColor={color} size={24} />
             ) : (
               <Feather name="users" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="notices"
+        options={{
+          title: "Avisos",
+          tabBarBadge: noticesUnread > 0 ? noticesUnread : undefined,
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="bell" tintColor={color} size={24} />
+            ) : (
+              <Feather name="bell" size={22} color={color} />
             ),
         }}
       />
