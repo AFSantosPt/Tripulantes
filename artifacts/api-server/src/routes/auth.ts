@@ -168,12 +168,18 @@ router.post("/auth/members/:id/categories", async (req, res) => {
   if (id !== requester.id && !requester.isAdmin) {
     res.status(403).json({ error: "Sem permissão" }); return;
   }
-  const { categories } = req.body ?? {};
+  const { categories, categoryOtherLabel } = req.body ?? {};
   if (!Array.isArray(categories)) { res.status(400).json({ error: "categories inválidas" }); return; }
   const validCats = (categories as string[]).filter((c): c is CrewCategory =>
     ALL_CREW_CATEGORIES.includes(c as CrewCategory),
   );
-  const updated = await updateMember(id, { categories: validCats });
+  const otherLabel = validCats.includes("outro")
+    ? (typeof categoryOtherLabel === "string" ? categoryOtherLabel.trim() : undefined) ?? null
+    : null;
+  const updated = await updateMember(id, {
+    categories: validCats,
+    categoryOtherLabel: otherLabel ?? undefined,
+  });
   res.json({ member: sanitize(updated!) });
 });
 

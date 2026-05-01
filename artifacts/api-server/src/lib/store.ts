@@ -19,6 +19,7 @@ export interface CrewMember {
   status: AccountStatus;
   isAdmin: boolean;
   categories: CrewCategory[];
+  categoryOtherLabel?: string;
   createdAt: string;
   approvedAt?: string;
   approvedById?: string;
@@ -33,6 +34,7 @@ function rowToMember(row: any): CrewMember {
     status: row.status as AccountStatus,
     isAdmin: row.is_admin,
     categories: row.categories ?? [],
+    categoryOtherLabel: row.category_other_label ?? undefined,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
     approvedAt: row.approved_at ? (row.approved_at instanceof Date ? row.approved_at.toISOString() : String(row.approved_at)) : undefined,
     approvedById: row.approved_by_id ?? undefined,
@@ -57,9 +59,9 @@ export async function findMemberById(id: string): Promise<CrewMember | undefined
 export async function createMember(m: Omit<CrewMember, "id" | "createdAt">): Promise<CrewMember> {
   const id = newId();
   const res = await pool.query(
-    `INSERT INTO members (id, name, crew_id, password_hash, status, is_admin, categories, created_at, approved_at, approved_by_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),$8,$9) RETURNING *`,
-    [id, m.name, m.crewId, m.passwordHash, m.status, m.isAdmin, m.categories, m.approvedAt ?? null, m.approvedById ?? null],
+    `INSERT INTO members (id, name, crew_id, password_hash, status, is_admin, categories, category_other_label, created_at, approved_at, approved_by_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),$9,$10) RETURNING *`,
+    [id, m.name, m.crewId, m.passwordHash, m.status, m.isAdmin, m.categories, m.categoryOtherLabel ?? null, m.approvedAt ?? null, m.approvedById ?? null],
   );
   return rowToMember(res.rows[0]);
 }
@@ -73,8 +75,9 @@ export async function updateMember(id: string, fields: Partial<Omit<CrewMember, 
   if (fields.passwordHash !== undefined){ sets.push(`password_hash=$${idx++}`);  vals.push(fields.passwordHash); }
   if (fields.status !== undefined)      { sets.push(`status=$${idx++}`);         vals.push(fields.status); }
   if (fields.isAdmin !== undefined)     { sets.push(`is_admin=$${idx++}`);       vals.push(fields.isAdmin); }
-  if (fields.categories !== undefined)  { sets.push(`categories=$${idx++}`);     vals.push(fields.categories); }
-  if (fields.approvedAt !== undefined)  { sets.push(`approved_at=$${idx++}`);    vals.push(fields.approvedAt); }
+  if (fields.categories !== undefined)         { sets.push(`categories=$${idx++}`);              vals.push(fields.categories); }
+  if (fields.categoryOtherLabel !== undefined) { sets.push(`category_other_label=$${idx++}`);     vals.push(fields.categoryOtherLabel); }
+  if (fields.approvedAt !== undefined)         { sets.push(`approved_at=$${idx++}`);              vals.push(fields.approvedAt); }
   if (fields.approvedById !== undefined){ sets.push(`approved_by_id=$${idx++}`); vals.push(fields.approvedById); }
   if (!sets.length) return findMemberById(id);
   vals.push(id);

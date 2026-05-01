@@ -261,7 +261,11 @@ export default function TeamScreen() {
                   ]}
                 >
                   {user?.categories?.length
-                    ? user.categories.map((c) => CREW_CATEGORY_LABELS[c]).join(" · ")
+                    ? user.categories.map((c) =>
+                        c === "outro" && user.categoryOtherLabel
+                          ? user.categoryOtherLabel
+                          : CREW_CATEGORY_LABELS[c]
+                      ).join(" · ")
                     : "Nenhuma categoria definida"}
                 </Text>
               </View>
@@ -388,6 +392,7 @@ export default function TeamScreen() {
                     {m.categories && m.categories.length > 0 ? (
                       <CategoryChips
                         categories={m.categories}
+                        categoryOtherLabel={m.categoryOtherLabel}
                         colors={colors}
                       />
                     ) : null}
@@ -535,6 +540,7 @@ export default function TeamScreen() {
                   {m.categories && m.categories.length > 0 ? (
                     <CategoryChips
                       categories={m.categories}
+                      categoryOtherLabel={m.categoryOtherLabel}
                       colors={colors}
                     />
                   ) : null}
@@ -653,9 +659,11 @@ export default function TeamScreen() {
 
 function CategoryChips({
   categories,
+  categoryOtherLabel,
   colors,
 }: {
   categories: CrewCategory[];
+  categoryOtherLabel?: string;
   colors: ReturnType<typeof useColors>;
 }) {
   return (
@@ -669,7 +677,9 @@ function CategoryChips({
           ]}
         >
           <Text style={[chipStyles.chipText, { color: colors.mutedForeground }]}>
-            {CREW_CATEGORY_LABELS[cat]}
+            {cat === "outro" && categoryOtherLabel
+              ? categoryOtherLabel
+              : CREW_CATEGORY_LABELS[cat]}
           </Text>
         </View>
       ))}

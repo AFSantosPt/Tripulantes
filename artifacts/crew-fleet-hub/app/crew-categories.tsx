@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { TextField } from "@/components/TextField";
 import {
   ALL_CREW_CATEGORIES,
   CREW_CATEGORY_LABELS,
@@ -41,11 +42,15 @@ export default function CrewCategoriesScreen() {
   const [selected, setSelected] = useState<CrewCategory[]>(
     targetMember?.categories ?? [],
   );
+  const [otherLabel, setOtherLabel] = useState<string>(
+    targetMember?.categoryOtherLabel ?? "",
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setSelected(targetMember?.categories ?? []);
+    setOtherLabel(targetMember?.categoryOtherLabel ?? "");
   }, [targetMember?.id]);
 
   const toggle = (cat: CrewCategory) => {
@@ -55,11 +60,17 @@ export default function CrewCategoriesScreen() {
     );
   };
 
+  const hasOutro = selected.includes("outro");
+
   const handleSave = async () => {
     if (selected.length === 0 || !canEdit) return;
     setSaving(true);
     try {
-      await updateCategories(targetId, selected);
+      await updateCategories(
+        targetId,
+        selected,
+        hasOutro && otherLabel.trim() ? otherLabel.trim() : undefined,
+      );
       setSaved(true);
       setTimeout(() => router.back(), 700);
     } catch {
@@ -212,6 +223,18 @@ export default function CrewCategoriesScreen() {
             );
           })}
         </View>
+
+        {hasOutro ? (
+          <TextField
+            label="Descrição da função (opcional)"
+            placeholder="Ex: Fiscal, Chefe de Linha, Formador..."
+            value={otherLabel}
+            onChangeText={(t) => { setSaved(false); setOtherLabel(t); }}
+            autoCapitalize="words"
+            autoCorrect={false}
+            maxLength={60}
+          />
+        ) : null}
 
         {selected.length === 0 ? (
           <Text style={[styles.warning, { color: colors.destructive }]}>

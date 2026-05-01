@@ -35,6 +35,7 @@ export interface CrewMember {
   status: AccountStatus;
   isAdmin: boolean;
   categories: CrewCategory[];
+  categoryOtherLabel?: string;
   createdAt: string;
   approvedAt?: string;
   approvedById?: string;
@@ -70,6 +71,7 @@ interface AuthState {
   updateCategories: (
     memberId: string,
     categories: CrewCategory[],
+    categoryOtherLabel?: string,
   ) => Promise<void>;
   changePassword: (input: {
     current: string;
@@ -279,13 +281,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateCategories = useCallback(
-    async (memberId: string, categories: CrewCategory[]) => {
+    async (memberId: string, categories: CrewCategory[], categoryOtherLabel?: string) => {
       if (!user) return;
       try {
         const res = await apiFetch(`/api/auth/members/${memberId}/categories`, {
           method: "POST",
           memberId: user.id,
-          body: JSON.stringify({ categories }),
+          body: JSON.stringify({ categories, categoryOtherLabel }),
         });
         if (res.ok) {
           const data = await res.json();
