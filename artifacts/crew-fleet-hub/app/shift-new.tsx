@@ -111,6 +111,7 @@ export default function NewShiftScreen() {
     start?: { location?: string; time?: string };
     end?: { location?: string; time?: string };
     range?: string;
+    overlap?: string;
     duplicate?: string;
   }>({});
 
@@ -222,6 +223,21 @@ export default function NewShiftScreen() {
         endTimeMin < startTimeMin
       ) {
         next.range = "A hora de fim tem de ser igual ou superior à de início";
+      }
+
+      if (startTimeMin != null && endTimeMin != null && !next.range) {
+        const targetDate = iso ?? displayDateToIso(dateInput);
+        const overlapping = shifts.filter((s) => {
+          if (s.date !== targetDate) return false;
+          if (s.id === editingId) return false;
+          if (!s.stops || s.stops.length < 2) return false;
+          if (s.affectation === "folga" || s.affectation === "ferias") return false;
+          return startTimeMin < s.endMinutes && s.startMinutes < endTimeMin;
+        });
+        if (overlapping.length > 0) {
+          const ex = overlapping[0];
+          next.overlap = `Sobreposição com serviço existente das ${ex.stops[0].time} às ${ex.stops[ex.stops.length - 1].time}`;
+        }
       }
     }
 
@@ -549,6 +565,13 @@ export default function NewShiftScreen() {
                     {errors.range}
                   </Text>
                 ) : null}
+                {errors.overlap ? (
+                  <Text
+                    style={[styles.errorText, { color: colors.destructive }]}
+                  >
+                    {errors.overlap}
+                  </Text>
+                ) : null}
               </>
             ) : null}
 
@@ -578,8 +601,8 @@ export default function NewShiftScreen() {
                       { color: colors.foreground },
                     ]}
                   >
-                    Só é permitido salvar no mesmo dia se as horas não forem
-                    iguais.
+                    Pode ter vários serviços no mesmo dia, desde que os
+                    horários não se sobreponham.
                   </Text>
                 </View>
               </>
