@@ -183,6 +183,17 @@ router.post("/auth/members/:id/categories", async (req, res) => {
   res.json({ member: sanitize(updated!) });
 });
 
+router.patch("/auth/nickname", async (req, res) => {
+  const requesterId = req.headers["x-member-id"] as string | undefined;
+  if (!requesterId) { res.status(403).json({ error: "Sessão inválida" }); return; }
+  const member = await findMemberById(requesterId);
+  if (!member || member.status !== "active") { res.status(403).json({ error: "Sessão inválida" }); return; }
+  const { nickname } = req.body ?? {};
+  const trimmed = nickname?.trim() ?? "";
+  const updated = await updateMember(requesterId, { nickname: trimmed || null as any });
+  res.json({ member: sanitize(updated!) });
+});
+
 router.post("/auth/change-password", async (req, res) => {
   const requesterId = req.headers["x-member-id"] as string | undefined;
   if (!requesterId) { res.status(403).json({ error: "Sessão inválida" }); return; }

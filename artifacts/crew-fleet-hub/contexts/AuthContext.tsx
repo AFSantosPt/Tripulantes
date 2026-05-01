@@ -34,6 +34,7 @@ export interface CrewMember {
   id: string;
   name: string;
   crewId: string;
+  nickname?: string;
   status: AccountStatus;
   isAdmin: boolean;
   categories: CrewCategory[];
@@ -79,6 +80,7 @@ interface AuthState {
     current: string;
     next: string;
   }) => Promise<{ ok: true } | { ok: false; error: string }>;
+  updateNickname: (nickname: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   refreshMembers: () => Promise<void>;
 }
 
@@ -326,6 +328,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user],
   );
 
+  const updateNickname = useCallback<AuthState["updateNickname"]>(
+    async (nickname) => {
+      if (!user) return { ok: false, error: "Sessão inválida" };
+      try {
+        const res = await apiFetch("/api/auth/nickname", {
+          method: "PATCH",
+          memberId: user.id,
+          body: JSON.stringify({ nickname }),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, error: data.error ?? "Erro" };
+        setUser(data.member as CrewMember);
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
+        return { ok: false, error: msg };
+      }
+    },
+    [user],
+  );
+
   const value = useMemo<AuthState>(() => {
     const pending = members.filter((m) => m.status === "pending");
     const active = members.filter((m) => m.status === "active");
@@ -345,6 +368,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       removeMember,
       updateCategories,
       changePassword,
+      updateNickname,
       refreshMembers,
     };
   }, [
@@ -361,6 +385,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     removeMember,
     updateCategories,
     changePassword,
+    updateNickname,
     refreshMembers,
   ]);
 

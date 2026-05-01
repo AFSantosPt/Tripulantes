@@ -275,6 +275,51 @@ export default function TeamScreen() {
                 color={colors.mutedForeground}
               />
             </Pressable>
+            <Pressable
+              onPress={() => router.push("/nickname")}
+              style={({ pressed }) => [
+                styles.passwordRow,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  borderRadius: colors.radius,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.passwordIcon,
+                  { backgroundColor: colors.muted },
+                ]}
+              >
+                <Feather
+                  name="smile"
+                  size={16}
+                  color={colors.mutedForeground}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[styles.passwordTitle, { color: colors.foreground }]}
+                >
+                  Alcunha
+                </Text>
+                <Text
+                  style={[
+                    styles.passwordMeta,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  {user?.nickname ? user.nickname : "Sem alcunha definida"}
+                </Text>
+              </View>
+              <Feather
+                name="chevron-right"
+                size={20}
+                color={colors.mutedForeground}
+              />
+            </Pressable>
             {!isAdmin ? (
               <View
                 style={[
@@ -378,7 +423,7 @@ export default function TeamScreen() {
                         { color: colors.foreground },
                       ]}
                     >
-                      {m.name}
+                      {m.name}{m.nickname ? ` (${m.nickname})` : ""}
                     </Text>
                     <Text
                       style={[
@@ -503,8 +548,7 @@ export default function TeamScreen() {
                         { color: colors.foreground },
                       ]}
                     >
-                      {m.name}
-                      {isSelf ? "  (tu)" : ""}
+                      {m.name}{m.nickname ? ` (${m.nickname})` : ""}{isSelf ? "  (tu)" : ""}
                     </Text>
                     {m.isAdmin ? (
                       <View
