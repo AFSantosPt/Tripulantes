@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MonthCalendar } from "@/components/MonthCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useShifts, ShiftWithCalc } from "@/contexts/ShiftsContext";
+import { VEHICLE_LABELS, VehicleKind } from "@/contexts/BreakdownsContext";
 import { useColors } from "@/hooks/useColors";
 import {
   affectationDisplay,
@@ -491,6 +492,9 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
   const { removeShift } = useShifts();
   const codeLabel = shift.code?.trim() || "Sem código";
   const vehicleLabel = shift.vehicleCode?.trim();
+  const kindLabel = shift.vehicleKind
+    ? VEHICLE_LABELS[shift.vehicleKind as VehicleKind]
+    : null;
   const affLabel =
     affectationDisplay(shift.affectation, shift.affectationLabel);
   const isPast = shift.date < today;
@@ -550,6 +554,23 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
             >
               <Text style={[styles.tagLabel, { color: colors.primary }]}>
                 Troca
+              </Text>
+            </View>
+          ) : null}
+          {!isAbsence && kindLabel ? (
+            <View
+              style={[
+                styles.tag,
+                {
+                  backgroundColor: colors.muted,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.tagLabel, { color: colors.mutedForeground }]}>
+                {kindLabel}
               </Text>
             </View>
           ) : null}

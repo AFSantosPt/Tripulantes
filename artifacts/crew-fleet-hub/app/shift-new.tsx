@@ -106,6 +106,7 @@ export default function NewShiftScreen() {
   );
   const [errors, setErrors] = useState<{
     date?: string;
+    vehicleKind?: string;
     start?: { location?: string; time?: string };
     end?: { location?: string; time?: string };
     range?: string;
@@ -198,6 +199,10 @@ export default function NewShiftScreen() {
     }
 
     if (!isAbsenceType) {
+      if (!vehicleKind) {
+        next.vehicleKind = "Obrigatório selecionar o tipo de veículo";
+      }
+
       const startTimeMin = parseTimeToMinutes(start.time);
       const endTimeMin = parseTimeToMinutes(end.time);
       const startErr: { location?: string; time?: string } = {};
@@ -460,7 +465,16 @@ export default function NewShiftScreen() {
 
                 {vehicleOptions.length > 1 ? (
                   <View style={{ gap: 6 }}>
-                    <Text style={[styles.label, { color: colors.foreground }]}>
+                    <Text
+                      style={[
+                        styles.label,
+                        {
+                          color: errors.vehicleKind
+                            ? colors.destructive
+                            : colors.foreground,
+                        },
+                      ]}
+                    >
                       Tipo de veículo
                     </Text>
                     <View style={styles.chipRow}>
@@ -469,9 +483,10 @@ export default function NewShiftScreen() {
                         return (
                           <Pressable
                             key={opt.value}
-                            onPress={() =>
-                              setVehicleKind(selected ? undefined : opt.value)
-                            }
+                            onPress={() => {
+                              setVehicleKind(opt.value);
+                              setErrors((e) => ({ ...e, vehicleKind: undefined }));
+                            }}
                             style={({ pressed }) => [
                               styles.chip,
                               {
@@ -480,6 +495,8 @@ export default function NewShiftScreen() {
                                   : colors.card,
                                 borderColor: selected
                                   ? colors.primary
+                                  : errors.vehicleKind
+                                  ? colors.destructive
                                   : colors.border,
                                 borderRadius: colors.radius,
                                 opacity: pressed ? 0.8 : 1,
@@ -502,6 +519,13 @@ export default function NewShiftScreen() {
                         );
                       })}
                     </View>
+                    {errors.vehicleKind ? (
+                      <Text
+                        style={[styles.errorText, { color: colors.destructive }]}
+                      >
+                        {errors.vehicleKind}
+                      </Text>
+                    ) : null}
                   </View>
                 ) : null}
 
