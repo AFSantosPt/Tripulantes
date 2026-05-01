@@ -140,3 +140,18 @@ router.delete("/breakdowns/:id/photos/:photoId", async (req, res) => {
 });
 
 export default router;
+
+const TWO_MONTHS_MS = 60 * 24 * 60 * 60 * 1000;
+
+export async function cleanupOldResolvedBreakdowns(): Promise<void> {
+  const r = await pool.query("SELECT * FROM breakdowns");
+  for (const row of r.rows) {
+    const b = rowToBreakdown(row);
+    if (b.confirmations.length < REQUIRED_CONFIRMATIONS) continue;
+    const lastAt = b.confirmations[b.confirmations.length - 1]?.at;
+    if (!lastAt) continue;
+    if (Date.now() - new Date(lastAt).getTime() >= TWO_MONTHS_MS) {
+      await pool.query("DELETE FROM breakdowns WHERE id=$1", [b.id]);
+    }
+  }
+}

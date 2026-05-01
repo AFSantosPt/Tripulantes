@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,8 +33,13 @@ export default function BreakdownsScreen() {
   const { user } = useAuth();
   const { active, resolved } = useBreakdowns();
   const [tab, setTab] = useState<Tab>("active");
+  const [search, setSearch] = useState("");
 
-  const data = tab === "active" ? active : resolved;
+  const base = tab === "active" ? active : resolved;
+  const query = search.trim().toLowerCase();
+  const data = query
+    ? base.filter((b) => b.fleetNumber.toLowerCase().includes(query))
+    : base;
 
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? Math.max(insets.top, 67) : insets.top;
@@ -92,7 +98,7 @@ export default function BreakdownsScreen() {
             <View style={{ marginTop: 14 }}>
               <SegmentedControl<Tab>
                 value={tab}
-                onChange={setTab}
+                onChange={(t) => { setTab(t); setSearch(""); }}
                 options={[
                   { value: "active", label: `Ativas · ${active.length}` },
                   {
@@ -101,6 +107,34 @@ export default function BreakdownsScreen() {
                   },
                 ]}
               />
+            </View>
+
+            <View
+              style={[
+                styles.searchRow,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: search ? colors.primary : colors.border,
+                  borderRadius: colors.radius,
+                },
+              ]}
+            >
+              <Feather name="search" size={16} color={colors.mutedForeground} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.foreground }]}
+                placeholder="Filtrar por nº de viatura..."
+                placeholderTextColor={colors.mutedForeground}
+                value={search}
+                onChangeText={setSearch}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                returnKeyType="search"
+              />
+              {search.length > 0 ? (
+                <Pressable onPress={() => setSearch("")} hitSlop={8}>
+                  <Feather name="x" size={16} color={colors.mutedForeground} />
+                </Pressable>
+              ) : null}
             </View>
           </View>
         }
@@ -113,7 +147,13 @@ export default function BreakdownsScreen() {
           />
         )}
         ListEmptyComponent={
-          tab === "active" ? (
+          query ? (
+            <EmptyState
+              icon="search"
+              title={`Sem resultados para "${search}"`}
+              description="Nenhuma avaria com esse número de viatura."
+            />
+          ) : tab === "active" ? (
             <EmptyState
               icon="check-circle"
               title="Sem avarias ativas"
@@ -337,6 +377,21 @@ const styles = StyleSheet.create({
   ctaLabel: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    marginTop: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+    paddingVertical: 0,
   },
   card: {
     borderWidth: 1,
