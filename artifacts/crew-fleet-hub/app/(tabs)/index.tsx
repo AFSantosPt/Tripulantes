@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MonthCalendar } from "@/components/MonthCalendar";
 import { useConfirm } from "@/components/ConfirmModal";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotices } from "@/contexts/NoticesContext";
 import { useShifts, ShiftWithCalc } from "@/contexts/ShiftsContext";
 import { VEHICLE_LABELS, VehicleKind } from "@/contexts/BreakdownsContext";
 import { FOLGA_GROUPS, FolgaGroup, getFolgaDaysForYear } from "@/utils/folgaSchedule";
@@ -37,6 +38,7 @@ export default function ShiftsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const { unreadCount: noticesUnread } = useNotices();
   const { shifts, setMultipleSwapAvailable } = useShifts();
 
   const today = todayIso();
@@ -146,24 +148,71 @@ export default function ShiftsScreen() {
               {user?.name ?? "Tripulante"}
             </Text>
           </View>
-          <Pressable
-            onPress={signOut}
-            style={({ pressed }) => [
-              styles.iconBtn,
-              {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                borderRadius: colors.radius,
-                opacity: pressed ? 0.85 : 1,
-              },
-            ]}
-          >
-            <Feather
-              name="log-out"
-              size={18}
-              color={colors.mutedForeground}
-            />
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Pressable
+              onPress={() => router.push("/(tabs)/notices")}
+              style={({ pressed }) => [
+                styles.iconBtn,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: noticesUnread > 0 ? colors.destructive : colors.border,
+                  borderRadius: colors.radius,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Feather
+                name="bell"
+                size={18}
+                color={noticesUnread > 0 ? colors.destructive : colors.mutedForeground}
+              />
+              {noticesUnread > 0 && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: -4,
+                    right: -4,
+                    backgroundColor: colors.destructive,
+                    borderRadius: 8,
+                    minWidth: 16,
+                    height: 16,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingHorizontal: 3,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#FFFFFF",
+                      fontSize: 9,
+                      fontFamily: "Inter_700Bold",
+                      lineHeight: 12,
+                    }}
+                  >
+                    {noticesUnread > 9 ? "9+" : String(noticesUnread)}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={signOut}
+              style={({ pressed }) => [
+                styles.iconBtn,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  borderRadius: colors.radius,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Feather
+                name="log-out"
+                size={18}
+                color={colors.mutedForeground}
+              />
+            </Pressable>
+          </View>
         </View>
 
         <View
