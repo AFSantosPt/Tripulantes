@@ -21,10 +21,9 @@ import {
 } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-const CATEGORY_DESCRIPTIONS: Record<CrewCategory, string> = {
+const CATEGORY_DESCRIPTIONS: Partial<Record<CrewCategory, string>> = {
   motorista: "Conduz autocarros · pode reportar avarias de autocarro",
   "guarda-freio": "Opera elétricos · pode reportar avarias de elétrico",
-  outro: "Outra função operacional",
 };
 
 export default function CrewCategoriesScreen() {
@@ -207,17 +206,19 @@ export default function CrewCategoriesScreen() {
                   >
                     {CREW_CATEGORY_LABELS[cat]}
                   </Text>
-                  <Text
-                    style={[
-                      styles.optionDesc,
-                      {
-                        color: active ? colors.primaryForeground : colors.mutedForeground,
-                        opacity: active ? 0.8 : 1,
-                      },
-                    ]}
-                  >
-                    {CATEGORY_DESCRIPTIONS[cat]}
-                  </Text>
+                  {CATEGORY_DESCRIPTIONS[cat] ? (
+                    <Text
+                      style={[
+                        styles.optionDesc,
+                        {
+                          color: active ? colors.primaryForeground : colors.mutedForeground,
+                          opacity: active ? 0.8 : 1,
+                        },
+                      ]}
+                    >
+                      {CATEGORY_DESCRIPTIONS[cat]}
+                    </Text>
+                  ) : null}
                 </View>
               </Pressable>
             );
