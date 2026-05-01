@@ -81,6 +81,8 @@ interface AuthState {
     next: string;
   }) => Promise<{ ok: true } | { ok: false; error: string }>;
   updateNickname: (nickname: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  updateName: (name: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  adminUpdateName: (memberId: string, name: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   refreshMembers: () => Promise<void>;
 }
 
@@ -349,6 +351,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user],
   );
 
+  const updateName = useCallback<AuthState["updateName"]>(
+    async (name) => {
+      if (!user) return { ok: false, error: "Sessão inválida" };
+      try {
+        const res = await apiFetch("/api/auth/name", {
+          method: "PATCH",
+          memberId: user.id,
+          body: JSON.stringify({ name }),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, error: data.error ?? "Erro" };
+        setUser(data.member as CrewMember);
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
+        return { ok: false, error: msg };
+      }
+    },
+    [user],
+  );
+
+  const adminUpdateName = useCallback<AuthState["adminUpdateName"]>(
+    async (memberId, name) => {
+      if (!user) return { ok: false, error: "Sessão inválida" };
+      try {
+        const res = await apiFetch(`/api/auth/members/${memberId}/name`, {
+          method: "PATCH",
+          memberId: user.id,
+          body: JSON.stringify({ name }),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, error: data.error ?? "Erro" };
+        const updated = data.member as CrewMember;
+        if (memberId === user.id) setUser(updated);
+        await fetchMembers(user.id);
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
+        return { ok: false, error: msg };
+      }
+    },
+    [user, fetchMembers],
+  );
+
   const value = useMemo<AuthState>(() => {
     const pending = members.filter((m) => m.status === "pending");
     const active = members.filter((m) => m.status === "active");
@@ -369,6 +415,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updateCategories,
       changePassword,
       updateNickname,
+      updateName,
+      adminUpdateName,
       refreshMembers,
     };
   }, [
@@ -386,6 +434,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateCategories,
     changePassword,
     updateNickname,
+    updateName,
+    adminUpdateName,
     refreshMembers,
   ]);
 

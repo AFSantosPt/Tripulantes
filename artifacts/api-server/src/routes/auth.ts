@@ -183,6 +183,30 @@ router.post("/auth/members/:id/categories", async (req, res) => {
   res.json({ member: sanitize(updated!) });
 });
 
+router.patch("/auth/name", async (req, res) => {
+  const requesterId = req.headers["x-member-id"] as string | undefined;
+  if (!requesterId) { res.status(403).json({ error: "Sessão inválida" }); return; }
+  const member = await findMemberById(requesterId);
+  if (!member || member.status !== "active") { res.status(403).json({ error: "Sessão inválida" }); return; }
+  const { name } = req.body ?? {};
+  if (!name?.trim()) { res.status(400).json({ error: "O nome não pode ser vazio" }); return; }
+  const updated = await updateMember(requesterId, { name: name.trim() });
+  res.json({ member: sanitize(updated!) });
+});
+
+router.patch("/auth/members/:id/name", async (req, res) => {
+  const requesterId = req.headers["x-member-id"] as string | undefined;
+  if (!requesterId) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const admin = await findMemberById(requesterId);
+  if (!admin || admin.status !== "active" || !admin.isAdmin) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const target = await findMemberById(req.params.id);
+  if (!target) { res.status(404).json({ error: "Membro não encontrado" }); return; }
+  const { name } = req.body ?? {};
+  if (!name?.trim()) { res.status(400).json({ error: "O nome não pode ser vazio" }); return; }
+  const updated = await updateMember(req.params.id, { name: name.trim() });
+  res.json({ member: sanitize(updated!) });
+});
+
 router.patch("/auth/nickname", async (req, res) => {
   const requesterId = req.headers["x-member-id"] as string | undefined;
   if (!requesterId) { res.status(403).json({ error: "Sessão inválida" }); return; }

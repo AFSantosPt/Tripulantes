@@ -179,6 +179,31 @@ export default function TeamScreen() {
               </Pressable>
             </View>
             <Pressable
+              onPress={() => router.push("/edit-name")}
+              style={({ pressed }) => [
+                styles.passwordRow,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  borderRadius: colors.radius,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <View style={[styles.passwordIcon, { backgroundColor: colors.muted }]}>
+                <Feather name="user" size={16} color={colors.mutedForeground} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.passwordTitle, { color: colors.foreground }]}>
+                  Editar nome
+                </Text>
+                <Text style={[styles.passwordMeta, { color: colors.mutedForeground }]}>
+                  {user?.name ?? ""}
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
+            </Pressable>
+            <Pressable
               onPress={() => router.push("/change-password")}
               style={({ pressed }) => [
                 styles.passwordRow,
@@ -592,6 +617,27 @@ export default function TeamScreen() {
               </View>
               {isAdmin && !isSelf ? (
                 <View style={styles.actionRow}>
+                  <Pressable
+                    onPress={() =>
+                      router.push({
+                        pathname: "/edit-name",
+                        params: { memberId: m.id },
+                      })
+                    }
+                    style={({ pressed }) => [
+                      styles.actionBtnGhost,
+                      {
+                        borderColor: colors.border,
+                        borderRadius: colors.radius,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                  >
+                    <Feather name="edit-2" size={14} color={colors.foreground} />
+                    <Text style={[styles.actionLabelSm, { color: colors.foreground }]}>
+                      Nome
+                    </Text>
+                  </Pressable>
                   <Pressable
                     onPress={() =>
                       router.push({
