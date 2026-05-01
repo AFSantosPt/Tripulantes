@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { useConfirm } from "@/components/ConfirmModal";
 import { TextField } from "@/components/TextField";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -28,19 +28,7 @@ export default function ChangePasswordScreen() {
   const [confirm, setConfirm] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
-
-  const showSuccess = (onClose: () => void) => {
-    if (Platform.OS === "web") {
-      window.alert("Password atualizada\n\nA tua password foi alterada com sucesso.");
-      onClose();
-    } else {
-      Alert.alert(
-        "Password atualizada",
-        "A tua password foi alterada com sucesso.",
-        [{ text: "OK", onPress: onClose }],
-      );
-    }
-  };
+  const { alert: showAlert, modal } = useConfirm();
 
   const handleSubmit = async () => {
     setError(null);
@@ -55,7 +43,7 @@ export default function ChangePasswordScreen() {
         setError(result.error);
         return;
       }
-      showSuccess(() => router.back());
+      showAlert("Password atualizada", "A tua password foi alterada com sucesso.", () => router.back());
     } catch {
       setError("Não foi possível alterar a password");
     } finally {
@@ -69,6 +57,7 @@ export default function ChangePasswordScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {modal}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}

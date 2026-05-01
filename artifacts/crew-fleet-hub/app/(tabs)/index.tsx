@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -14,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MonthCalendar } from "@/components/MonthCalendar";
+import { useConfirm } from "@/components/ConfirmModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useShifts, ShiftWithCalc } from "@/contexts/ShiftsContext";
 import { VEHICLE_LABELS, VehicleKind } from "@/contexts/BreakdownsContext";
@@ -501,6 +501,7 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
   const colors = useColors();
   const router = useRouter();
   const { removeShift } = useShifts();
+  const { confirm, modal } = useConfirm();
   const codeLabel = shift.code?.trim() || "Sem código";
   const vehicleLabel = shift.vehicleCode?.trim();
   const kindLabel = shift.vehicleKind
@@ -513,19 +514,13 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
   const badge = affectationBadgeColors(shift.affectation, colors);
 
   const handleDelete = () => {
-    const proceed = () => removeShift(shift.id);
-    if (Platform.OS === "web") {
-      if (window.confirm("Apagar este serviço? Esta ação não pode ser revertida.")) proceed();
-      return;
-    }
-    Alert.alert(
-      "Apagar serviço",
-      "Esta ação não pode ser revertida.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Apagar", style: "destructive", onPress: proceed },
-      ],
-    );
+    confirm({
+      title: "Apagar serviço",
+      message: "Esta ação não pode ser revertida.",
+      confirmLabel: "Apagar",
+      destructive: true,
+      onConfirm: () => removeShift(shift.id),
+    });
   };
 
   return (
@@ -539,6 +534,7 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
         },
       ]}
     >
+      {modal}
       <View style={styles.cardHead}>
         <View style={{ flex: 1 }}>
           <Text

@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { useConfirm } from "@/components/ConfirmModal";
 import { TextField } from "@/components/TextField";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -27,6 +27,7 @@ export default function NicknameScreen() {
   const [value, setValue] = useState(user?.nickname ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, modal } = useConfirm();
 
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? Math.max(insets.top, 67) : insets.top;
@@ -54,18 +55,13 @@ export default function NicknameScreen() {
         setSubmitting(false);
       }
     };
-    if (Platform.OS === "web") {
-      if (window.confirm("Remover alcunha?")) proceed();
-      return;
-    }
-    Alert.alert(
-      "Remover alcunha",
-      "A tua alcunha será removida.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Remover", style: "destructive", onPress: proceed },
-      ],
-    );
+    confirm({
+      title: "Remover alcunha",
+      message: "A tua alcunha será removida.",
+      confirmLabel: "Remover",
+      destructive: true,
+      onConfirm: proceed,
+    });
   };
 
   const displayName = user?.nickname
@@ -74,6 +70,7 @@ export default function NicknameScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {modal}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}

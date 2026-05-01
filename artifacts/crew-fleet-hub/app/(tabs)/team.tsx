@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   FlatList,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EmptyState } from "@/components/EmptyState";
+import { useConfirm } from "@/components/ConfirmModal";
 import {
   CREW_CATEGORY_LABELS,
   CrewCategory,
@@ -46,6 +46,7 @@ export default function TeamScreen() {
   } = useAuth();
 
   const [refreshing, setRefreshing] = useState(false);
+  const { confirm, modal } = useConfirm();
 
   useEffect(() => {
     if (!user?.isAdmin) return;
@@ -104,18 +105,12 @@ export default function TeamScreen() {
     message: string,
     onConfirm: () => void,
   ) => {
-    if (Platform.OS === "web") {
-      if (window.confirm(`${title}\n\n${message}`)) onConfirm();
-    } else {
-      Alert.alert(title, message, [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Confirmar", style: "destructive", onPress: onConfirm },
-      ]);
-    }
+    confirm({ title, message, confirmLabel: "Confirmar", destructive: true, onConfirm });
   };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {modal}
       <FlatList<Section>
         data={sections}
         keyExtractor={(s) => s.key}

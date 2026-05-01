@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { useConfirm } from "@/components/ConfirmModal";
 import { TextField } from "@/components/TextField";
 import {
   ALL_CREW_CATEGORIES,
@@ -37,20 +37,12 @@ export default function RegisterScreen() {
   const [categories, setCategories] = useState<CrewCategory[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const { alert: showInfo, modal } = useConfirm();
 
   const toggleCategory = (cat: CrewCategory) => {
     setCategories((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
     );
-  };
-
-  const showInfo = (title: string, message: string, onClose?: () => void) => {
-    if (Platform.OS === "web") {
-      window.alert(`${title}\n\n${message}`);
-      onClose?.();
-    } else {
-      Alert.alert(title, message, [{ text: "OK", onPress: onClose }]);
-    }
   };
 
   const handleSubmit = async () => {
@@ -102,6 +94,7 @@ export default function RegisterScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {modal}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}

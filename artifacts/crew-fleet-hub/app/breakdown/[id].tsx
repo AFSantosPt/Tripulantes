@@ -4,7 +4,6 @@ import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { useConfirm } from "@/components/ConfirmModal";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   BREAKDOWN_MAX_PHOTOS,
@@ -45,6 +45,7 @@ export default function BreakdownDetailScreen() {
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const { confirm, modal } = useConfirm();
   const [photoFeedback, setPhotoFeedback] = useState<string | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
 
@@ -135,56 +136,31 @@ export default function BreakdownDetailScreen() {
   };
 
   const handleRemovePhoto = (photo: BreakdownPhoto) => {
-    const proceed = async () => {
-      await removePhoto(breakdown.id, photo.id);
-    };
-    if (Platform.OS === "web") {
-      if (
-        typeof window !== "undefined" &&
-        window.confirm("Remover esta fotografia?")
-      ) {
-        proceed();
-      }
-      return;
-    }
-    Alert.alert(
-      "Remover fotografia",
-      "Esta ação não pode ser revertida.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Remover", style: "destructive", onPress: proceed },
-      ],
-      { cancelable: true },
-    );
+    confirm({
+      title: "Remover fotografia",
+      message: "Esta ação não pode ser revertida.",
+      confirmLabel: "Remover",
+      destructive: true,
+      onConfirm: () => removePhoto(breakdown.id, photo.id),
+    });
   };
 
   const handleDelete = () => {
-    const proceed = async () => {
-      await removeBreakdown(breakdown.id);
-      router.back();
-    };
-    if (Platform.OS === "web") {
-      if (
-        typeof window !== "undefined" &&
-        window.confirm("Eliminar este registo de avaria?")
-      ) {
-        proceed();
-      }
-      return;
-    }
-    Alert.alert(
-      "Eliminar avaria",
-      "Esta ação não pode ser revertida.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Eliminar", style: "destructive", onPress: proceed },
-      ],
-      { cancelable: true },
-    );
+    confirm({
+      title: "Eliminar avaria",
+      message: "Esta ação não pode ser revertida.",
+      confirmLabel: "Eliminar",
+      destructive: true,
+      onConfirm: async () => {
+        await removeBreakdown(breakdown.id);
+        router.back();
+      },
+    });
   };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {modal}
       <ScrollView
         contentContainerStyle={{
           paddingTop: topPad + 12,

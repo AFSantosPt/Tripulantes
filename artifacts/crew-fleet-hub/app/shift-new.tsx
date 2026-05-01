@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { useConfirm } from "@/components/ConfirmModal";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { TextField } from "@/components/TextField";
 import {
@@ -75,6 +75,7 @@ export default function NewShiftScreen() {
   const { user } = useAuth();
   const { shifts, addShift, updateShift, removeShift, byId } = useShifts();
   const params = useLocalSearchParams<{ date?: string; id?: string }>();
+  const { confirm, modal } = useConfirm();
 
   const vehicleOptions = vehicleOptionsForCategories(user?.categories ?? []);
   const defaultVehicleKind: VehicleKind | undefined =
@@ -266,24 +267,13 @@ export default function NewShiftScreen() {
       await removeShift(s.id);
       if (editingId === s.id) resetForm();
     };
-    if (Platform.OS === "web") {
-      if (
-        typeof window !== "undefined" &&
-        window.confirm("Apagar este serviço?")
-      ) {
-        proceed();
-      }
-      return;
-    }
-    Alert.alert(
-      "Apagar serviço",
-      "Esta ação não pode ser revertida.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Apagar", style: "destructive", onPress: proceed },
-      ],
-      { cancelable: true },
-    );
+    confirm({
+      title: "Apagar serviço",
+      message: "Esta ação não pode ser revertida.",
+      confirmLabel: "Apagar",
+      destructive: true,
+      onConfirm: proceed,
+    });
   };
 
   const isWeb = Platform.OS === "web";
@@ -292,6 +282,7 @@ export default function NewShiftScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {modal}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}

@@ -1,7 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import {
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -19,6 +18,7 @@ import {
 import { ShiftStop, ShiftWithCalc, useShifts } from "@/contexts/ShiftsContext";
 import { SwapRequest, useSwaps } from "@/contexts/SwapsContext";
 import { useColors } from "@/hooks/useColors";
+import { useConfirm } from "@/components/ConfirmModal";
 import { formatDateShort, todayIso } from "@/utils/time";
 import { formatDisplayName } from "@/utils/nameFormat";
 
@@ -213,6 +213,7 @@ function AvailableDayCard({
   onRequest: () => void;
 }) {
   const colors = useColors();
+  const { confirm, modal } = useConfirm();
   const date = shifts[0]?.date ?? "";
   const codesLabel = shifts
     .map((s) => s.code)
@@ -221,19 +222,12 @@ function AvailableDayCard({
 
   const handlePress = () => {
     const msg = `Pedir troca do dia ${formatDateShort(date)}${codesLabel ? ` (${codesLabel})` : ""} de ${offererName}?`;
-    if (Platform.OS === "web") {
-      if (typeof window !== "undefined" && window.confirm(msg)) onRequest();
-      return;
-    }
-    Alert.alert(
-      "Pedir troca",
-      msg,
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Pedir troca", onPress: onRequest },
-      ],
-      { cancelable: true },
-    );
+    confirm({
+      title: "Pedir troca",
+      message: msg,
+      confirmLabel: "Pedir troca",
+      onConfirm: onRequest,
+    });
   };
 
   return (
@@ -247,6 +241,7 @@ function AvailableDayCard({
         },
       ]}
     >
+      {modal}
       <View style={styles.cardTop}>
         <InitialsAvatar name={offererName} />
         <View style={{ flex: 1 }}>
@@ -325,6 +320,7 @@ function SentRequestCard({
   onCancel: () => void;
 }) {
   const colors = useColors();
+  const { confirm, modal } = useConfirm();
 
   const statusColor =
     req.status === "confirmed"
@@ -340,20 +336,13 @@ function SentRequestCard({
         : "Aguarda confirmação";
 
   const handleCancel = () => {
-    const msg = "Cancelar este pedido de troca?";
-    if (Platform.OS === "web") {
-      if (typeof window !== "undefined" && window.confirm(msg)) onCancel();
-      return;
-    }
-    Alert.alert(
-      "Cancelar pedido",
-      msg,
-      [
-        { text: "Não", style: "cancel" },
-        { text: "Cancelar pedido", style: "destructive", onPress: onCancel },
-      ],
-      { cancelable: true },
-    );
+    confirm({
+      title: "Cancelar pedido",
+      message: "Cancelar este pedido de troca?",
+      confirmLabel: "Cancelar pedido",
+      destructive: true,
+      onConfirm: onCancel,
+    });
   };
 
   return (
@@ -367,6 +356,7 @@ function SentRequestCard({
         },
       ]}
     >
+      {modal}
       <View style={styles.cardTop}>
         <InitialsAvatar name={req.offererName} />
         <View style={{ flex: 1 }}>
@@ -472,39 +462,25 @@ function ReceivedRequestCard({
   onReject: () => void;
 }) {
   const colors = useColors();
+  const { confirm, modal } = useConfirm();
 
   const handleConfirm = () => {
-    const msg = `Confirmar troca com ${req.requesterName}?`;
-    if (Platform.OS === "web") {
-      if (typeof window !== "undefined" && window.confirm(msg)) onConfirm();
-      return;
-    }
-    Alert.alert(
-      "Confirmar troca",
-      msg,
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Confirmar", onPress: onConfirm },
-      ],
-      { cancelable: true },
-    );
+    confirm({
+      title: "Confirmar troca",
+      message: `Confirmar troca com ${req.requesterName}?`,
+      confirmLabel: "Confirmar",
+      onConfirm,
+    });
   };
 
   const handleReject = () => {
-    const msg = `Recusar o pedido de ${req.requesterName}?`;
-    if (Platform.OS === "web") {
-      if (typeof window !== "undefined" && window.confirm(msg)) onReject();
-      return;
-    }
-    Alert.alert(
-      "Recusar pedido",
-      msg,
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Recusar", style: "destructive", onPress: onReject },
-      ],
-      { cancelable: true },
-    );
+    confirm({
+      title: "Recusar pedido",
+      message: `Recusar o pedido de ${req.requesterName}?`,
+      confirmLabel: "Recusar",
+      destructive: true,
+      onConfirm: onReject,
+    });
   };
 
   return (
@@ -519,6 +495,7 @@ function ReceivedRequestCard({
         },
       ]}
     >
+      {modal}
       <View
         style={[
           styles.receivedBanner,

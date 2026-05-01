@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { useConfirm } from "@/components/ConfirmModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { FOLGA_GROUPS } from "@/utils/folgaSchedule";
@@ -30,6 +30,7 @@ export default function FolgaGroupScreen() {
   const [selected, setSelected] = useState<string | null>(user?.folgaGroup ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, modal } = useConfirm();
 
   const handleSave = async () => {
     setError(null);
@@ -53,22 +54,18 @@ export default function FolgaGroupScreen() {
         setSubmitting(false);
       }
     };
-    if (Platform.OS === "web") {
-      if (window.confirm("Remover o grupo de folga?")) proceed();
-      return;
-    }
-    Alert.alert(
-      "Remover grupo",
-      "Os dias de folga deixarão de ser destacados no calendário.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Remover", style: "destructive", onPress: proceed },
-      ],
-    );
+    confirm({
+      title: "Remover grupo de folga",
+      message: "Os dias de folga deixarão de ser destacados no calendário.",
+      confirmLabel: "Remover",
+      destructive: true,
+      onConfirm: proceed,
+    });
   };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {modal}
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
