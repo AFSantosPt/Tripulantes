@@ -10,7 +10,8 @@ import React, {
 } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { newId } from "@/utils/id";
+import { apiFetch } from "@/utils/apiClient";
+
 import {
   ABSENCE_TYPES,
   AffectationType,
@@ -20,7 +21,9 @@ import {
   parseTimeToMinutes,
 } from "@/utils/time";
 
-const STORAGE_KEY = "@crew-fleet-hub/shifts/v1";
+const POLL_INTERVAL_MS = 30000;
+const LEGACY_STORAGE_KEY = "@crew-fleet-hub/shifts/v1";
+const MIGRATED_KEY = "@crew-fleet-hub/shifts/migrated-to-server";
 
 export interface ShiftStop {
   location: string;
@@ -67,15 +70,16 @@ interface ShiftsState {
   setSwapAvailable: (id: string, available: boolean) => Promise<void>;
   setMultipleSwapAvailable: (ids: string[], available: boolean) => Promise<void>;
   byId: (id: string) => ShiftWithCalc | undefined;
+  refresh: () => Promise<void>;
 }
 
 const ShiftsContext = createContext<ShiftsState | null>(null);
 
-function migrateLoadedShift(raw: any): Shift {
+function migrateRaw(raw: any): Shift {
   if (raw && Array.isArray(raw.stops) && raw.stops.length >= 2) {
     return {
       id: raw.id,
-      crewMemberId: raw.crewMemberId,
+      crewMemberId: raw.crewMemberId ?? "",
       date: raw.date,
       code: raw.code ?? undefined,
       vehicleCode: raw.vehicleCode ?? undefined,
@@ -93,7 +97,7 @@ function migrateLoadedShift(raw: any): Shift {
   const sm = typeof raw?.startMinutes === "number" ? raw.startMinutes : 0;
   const em = typeof raw?.endMinutes === "number" ? raw.endMinutes : sm;
   return {
-    id: raw?.id ?? newId(),
+    id: raw?.id ?? "",
     crewMemberId: raw?.crewMemberId ?? "",
     date: raw?.date ?? new Date().toISOString().slice(0, 10),
     code: raw?.code ?? undefined,
@@ -127,165 +131,203 @@ function decorate(shift: Shift): ShiftWithCalc {
 export function ShiftsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [allShifts, setAllShifts] = useState<Shift[]>([]);
   const shiftsRef = useRef<Shift[]>([]);
   const [isReady, setIsReady] = useState<boolean>(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            const migrated = parsed.map(migrateLoadedShift);
-            shiftsRef.current = migrated;
-            setShifts(migrated);
-            const needsRewrite = migrated.some(
-              (m, i) => !Array.isArray(parsed[i]?.stops),
-            );
-            if (needsRewrite) {
-              await AsyncStorage.setItem(
-                STORAGE_KEY,
-                JSON.stringify(migrated),
-              );
+  const fetchShifts = useCallback(async () => {
+    if (!user) return;
+    try {
+      const [mineRes, allRes] = await Promise.all([
+        apiFetch("/api/shifts", { memberId: user.id }),
+        apiFetch("/api/shifts/all", { memberId: user.id }),
+      ]);
+      if (mineRes.ok) {
+        const data = await mineRes.json();
+        const serverShifts = (data.shifts as any[]).map(migrateRaw);
+        if (serverShifts.length === 0) {
+          const alreadyMigrated = await AsyncStorage.getItem(MIGRATED_KEY);
+          if (!alreadyMigrated) {
+            const legacy = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
+            if (legacy) {
+              const parsed = JSON.parse(legacy) as any[];
+              const mine = parsed
+                .map(migrateRaw)
+                .filter((s) => s.crewMemberId === user.id || !s.crewMemberId);
+              for (const s of mine) {
+                const body = {
+                  date: s.date,
+                  code: s.code,
+                  vehicleCode: s.vehicleCode,
+                  affectation: s.affectation,
+                  affectationLabel: s.affectationLabel,
+                  stops: s.stops,
+                  notes: s.notes,
+                  availableForSwap: s.availableForSwap,
+                };
+                await apiFetch("/api/shifts", {
+                  method: "POST",
+                  memberId: user.id,
+                  body: JSON.stringify(body),
+                });
+              }
+              await AsyncStorage.setItem(MIGRATED_KEY, "1");
+              const refreshed = await apiFetch("/api/shifts", { memberId: user.id });
+              if (refreshed.ok) {
+                const d = await refreshed.json();
+                const migrated = (d.shifts as any[]).map(migrateRaw);
+                shiftsRef.current = migrated;
+                setShifts(migrated);
+              }
+              return;
             }
+            await AsyncStorage.setItem(MIGRATED_KEY, "1");
           }
         }
-      } catch (e) {
-        console.warn("Shifts load error", e);
-      } finally {
-        setIsReady(true);
+        shiftsRef.current = serverShifts;
+        setShifts(serverShifts);
       }
-    })();
-  }, []);
-
-  const persist = useCallback(async (next: Shift[]) => {
-    shiftsRef.current = next;
-    setShifts(next);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  }, []);
-
-  const findDuplicate = useCallback(
-    (
-      crewMemberId: string,
-      input: Omit<Shift, "id" | "createdAt" | "crewMemberId">,
-      ignoreId?: string,
-    ): Shift | undefined => {
-      if (ABSENCE_TYPES.has(input.affectation)) {
-        return shiftsRef.current.find(
-          (s) =>
-            s.id !== ignoreId &&
-            s.crewMemberId === crewMemberId &&
-            s.date === input.date &&
-            s.affectation === input.affectation,
-        );
+      if (allRes.ok) {
+        const data = await allRes.json();
+        setAllShifts((data.shifts as any[]).map(migrateRaw));
       }
-      const startTime = input.stops[0]?.time ?? "";
-      const endTime = input.stops[input.stops.length - 1]?.time ?? "";
-      return shiftsRef.current.find(
-        (s) =>
-          s.id !== ignoreId &&
-          s.crewMemberId === crewMemberId &&
-          s.date === input.date &&
-          !ABSENCE_TYPES.has(s.affectation) &&
-          (s.stops[0]?.time ?? "") === startTime &&
-          (s.stops[s.stops.length - 1]?.time ?? "") === endTime,
-      );
-    },
-    [],
-  );
+    } catch {}
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setShifts([]);
+      setAllShifts([]);
+      shiftsRef.current = [];
+      setIsReady(false);
+      return;
+    }
+    setIsReady(false);
+    fetchShifts().finally(() => setIsReady(true));
+    const interval = setInterval(fetchShifts, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [user, fetchShifts]);
 
   const addShift = useCallback<ShiftsState["addShift"]>(
     async (input) => {
       if (!user) return { ok: false, reason: "Sem sessão iniciada" };
-      if (findDuplicate(user.id, input)) {
-        return {
-          ok: false,
-          reason:
-            "Já existe um serviço neste dia com as mesmas horas de início e fim.",
-        };
+      try {
+        const res = await apiFetch("/api/shifts", {
+          method: "POST",
+          memberId: user.id,
+          body: JSON.stringify(input),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, reason: data.error ?? "Erro ao guardar" };
+        const created = migrateRaw(data.shift);
+        shiftsRef.current = [created, ...shiftsRef.current];
+        setShifts([created, ...shifts]);
+        setAllShifts((prev) => [created, ...prev]);
+        return { ok: true, id: created.id };
+      } catch {
+        return { ok: false, reason: "Erro de ligação" };
       }
-      const newShift: Shift = {
-        ...input,
-        id: newId(),
-        crewMemberId: user.id,
-        createdAt: new Date().toISOString(),
-      };
-      await persist([newShift, ...shiftsRef.current]);
-      return { ok: true, id: newShift.id };
     },
-    [persist, user, findDuplicate],
+    [user, shifts],
   );
 
   const updateShift = useCallback<ShiftsState["updateShift"]>(
     async (id, input) => {
       if (!user) return { ok: false, reason: "Sem sessão iniciada" };
-      const existing = shiftsRef.current.find((s) => s.id === id);
-      if (!existing) return { ok: false, reason: "Serviço não encontrado" };
-      if (existing.crewMemberId !== user.id) {
-        return { ok: false, reason: "Sem permissão para editar este serviço" };
+      try {
+        const res = await apiFetch(`/api/shifts/${id}`, {
+          method: "PUT",
+          memberId: user.id,
+          body: JSON.stringify(input),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, reason: data.error ?? "Erro ao atualizar" };
+        const updated = migrateRaw(data.shift);
+        shiftsRef.current = shiftsRef.current.map((s) => (s.id === id ? updated : s));
+        setShifts((prev) => prev.map((s) => (s.id === id ? updated : s)));
+        setAllShifts((prev) => prev.map((s) => (s.id === id ? updated : s)));
+        return { ok: true, id };
+      } catch {
+        return { ok: false, reason: "Erro de ligação" };
       }
-      if (findDuplicate(user.id, input, id)) {
-        return {
-          ok: false,
-          reason:
-            "Já existe outro serviço neste dia com as mesmas horas de início e fim.",
-        };
-      }
-      const updated: Shift = {
-        ...existing,
-        ...input,
-      };
-      await persist(shiftsRef.current.map((s) => (s.id === id ? updated : s)));
-      return { ok: true, id };
     },
-    [persist, user, findDuplicate],
+    [user],
   );
 
   const removeShift = useCallback(
     async (id: string) => {
-      await persist(shiftsRef.current.filter((s) => s.id !== id));
+      if (!user) return;
+      try {
+        const res = await apiFetch(`/api/shifts/${id}`, {
+          method: "DELETE",
+          memberId: user.id,
+        });
+        if (res.ok) {
+          shiftsRef.current = shiftsRef.current.filter((s) => s.id !== id);
+          setShifts((prev) => prev.filter((s) => s.id !== id));
+          setAllShifts((prev) => prev.filter((s) => s.id !== id));
+        }
+      } catch {}
     },
-    [persist],
+    [user],
   );
 
   const setSwapAvailable = useCallback(
     async (id: string, available: boolean) => {
-      await persist(
-        shiftsRef.current.map((s) => (s.id === id ? { ...s, availableForSwap: available } : s)),
-      );
+      if (!user) return;
+      try {
+        const res = await apiFetch(`/api/shifts/${id}/swap-available`, {
+          method: "PATCH",
+          memberId: user.id,
+          body: JSON.stringify({ available }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const updated = migrateRaw(data.shift);
+          shiftsRef.current = shiftsRef.current.map((s) => (s.id === id ? updated : s));
+          setShifts((prev) => prev.map((s) => (s.id === id ? updated : s)));
+          setAllShifts((prev) => prev.map((s) => (s.id === id ? updated : s)));
+        }
+      } catch {}
     },
-    [persist],
+    [user],
   );
 
   const setMultipleSwapAvailable = useCallback(
     async (ids: string[], available: boolean) => {
-      const set = new Set(ids);
-      await persist(
-        shiftsRef.current.map((s) => (set.has(s.id) ? { ...s, availableForSwap: available } : s)),
-      );
+      if (!user) return;
+      try {
+        const res = await apiFetch("/api/shifts/swap-available/bulk", {
+          method: "POST",
+          memberId: user.id,
+          body: JSON.stringify({ ids, available }),
+        });
+        if (res.ok) {
+          const idSet = new Set(ids);
+          const update = (s: Shift) =>
+            idSet.has(s.id) ? { ...s, availableForSwap: available } : s;
+          shiftsRef.current = shiftsRef.current.map(update);
+          setShifts((prev) => prev.map(update));
+          setAllShifts((prev) => prev.map(update));
+        }
+      } catch {}
     },
-    [persist],
+    [user],
   );
 
-  const byId = useCallback(
-    (id: string) => {
-      const raw = shiftsRef.current.find((s) => s.id === id);
-      return raw ? decorate(raw) : undefined;
-    },
-    [],
-  );
+  const byId = useCallback((id: string) => {
+    const raw = shiftsRef.current.find((s) => s.id === id);
+    return raw ? decorate(raw) : undefined;
+  }, []);
 
   const value = useMemo<ShiftsState>(() => {
-    const decorated = shifts.map(decorate);
-    const own = user
-      ? decorated
-          .filter((s) => s.crewMemberId === user.id)
-          .sort((a, b) => (a.date < b.date ? 1 : -1))
-      : [];
+    const decoratedMine = shifts
+      .map(decorate)
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+    const decoratedAll = allShifts.map(decorate);
     return {
-      shifts: own,
-      allShifts: decorated,
+      shifts: decoratedMine,
+      allShifts: decoratedAll,
       isReady,
       addShift,
       updateShift,
@@ -293,8 +335,20 @@ export function ShiftsProvider({ children }: { children: React.ReactNode }) {
       setSwapAvailable,
       setMultipleSwapAvailable,
       byId,
+      refresh: fetchShifts,
     };
-  }, [shifts, user, isReady, addShift, updateShift, removeShift, setSwapAvailable, setMultipleSwapAvailable, byId]);
+  }, [
+    shifts,
+    allShifts,
+    isReady,
+    addShift,
+    updateShift,
+    removeShift,
+    setSwapAvailable,
+    setMultipleSwapAvailable,
+    byId,
+    fetchShifts,
+  ]);
 
   return (
     <ShiftsContext.Provider value={value}>{children}</ShiftsContext.Provider>
