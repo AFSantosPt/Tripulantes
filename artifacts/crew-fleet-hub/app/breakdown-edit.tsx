@@ -20,9 +20,9 @@ import { VehicleKind, useBreakdowns } from "@/contexts/BreakdownsContext";
 import { useColors } from "@/hooks/useColors";
 
 const VEHICLE_OPTIONS: { value: VehicleKind; label: string }[] = [
-  { value: "autocarro", label: "Autocarros" },
-  { value: "eletrico", label: "Eléctricos" },
-  { value: "ascensor", label: "Ascensores" },
+  { value: "autocarro", label: "Autocarro" },
+  { value: "eletrico", label: "Eléctrico" },
+  { value: "ascensor", label: "Ascensor" },
 ];
 
 export default function EditBreakdownScreen() {

@@ -24,9 +24,9 @@ export const ALL_CREW_CATEGORIES: CrewCategory[] = [
 ];
 
 export const CREW_CATEGORY_LABELS: Record<CrewCategory, string> = {
-  "guarda-freio": "Eléctricos",
-  motorista: "Autocarros",
-  ascensor: "Ascensores",
+  "guarda-freio": "Eléctrico",
+  motorista: "Autocarro",
+  ascensor: "Ascensor",
   outro: "Outro",
 };
 

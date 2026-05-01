@@ -33,9 +33,9 @@ function vehicleOptionsForCategories(categories: string[]): { value: VehicleKind
   }
   if (kindSet.size === 0) { kindSet.add("autocarro"); kindSet.add("eletrico"); kindSet.add("ascensor"); }
   const all: { value: VehicleKind; label: string }[] = [
-    { value: "autocarro", label: "Autocarros" },
-    { value: "eletrico", label: "Eléctricos" },
-    { value: "ascensor", label: "Ascensores" },
+    { value: "autocarro", label: "Autocarro" },
+    { value: "eletrico", label: "Eléctrico" },
+    { value: "ascensor", label: "Ascensor" },
   ];
   return all.filter((o) => kindSet.has(o.value));
 }
