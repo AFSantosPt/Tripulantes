@@ -19,7 +19,7 @@ import { ShiftStop, ShiftWithCalc, useShifts } from "@/contexts/ShiftsContext";
 import { SwapRequest, useSwaps } from "@/contexts/SwapsContext";
 import { useColors } from "@/hooks/useColors";
 import { useConfirm } from "@/components/ConfirmModal";
-import { formatDateShort, todayIso } from "@/utils/time";
+import { formatDateShort, isoAddDays, todayIso } from "@/utils/time";
 import { formatDisplayName } from "@/utils/nameFormat";
 
 function categoriesCompatible(a: CrewCategory[], b: CrewCategory[]): boolean {
@@ -315,9 +315,11 @@ function AvailableDayCard({
 function SentRequestCard({
   req,
   onCancel,
+  offererPhone,
 }: {
   req: SwapRequest;
   onCancel: () => void;
+  offererPhone?: string;
 }) {
   const colors = useColors();
   const { confirm, modal } = useConfirm();
@@ -429,6 +431,22 @@ function SentRequestCard({
           </Text>
         </View>
       )}
+      {req.status === "confirmed" && offererPhone ? (
+        <View
+          style={[
+            styles.phoneRow,
+            { backgroundColor: colors.muted, borderRadius: colors.radius },
+          ]}
+        >
+          <Feather name="phone" size={13} color={colors.mutedForeground} />
+          <Text style={[styles.phoneText, { color: colors.foreground }]}>
+            {offererPhone}
+          </Text>
+          <Text style={[styles.phoneLabel, { color: colors.mutedForeground }]}>
+            contrato telefónico
+          </Text>
+        </View>
+      ) : null}
       {req.status === "pending" ? (
         <Pressable
           onPress={handleCancel}
@@ -571,6 +589,7 @@ export default function SwapsScreen() {
     : insets.bottom + 84;
 
   const { user, members } = useAuth();
+  const { confirm, modal } = useConfirm();
   const { allShifts } = useShifts();
   const { swapRequests, requestSwap, confirmSwap, rejectSwap, cancelSwap } =
     useSwaps();
@@ -591,6 +610,15 @@ export default function SwapsScreen() {
         .map((s) => s.date),
     );
 
+    const myShiftsByDate = new Map<string, ShiftWithCalc[]>();
+    for (const s of allShifts) {
+      if (s.crewMemberId !== user.id) continue;
+      if (!s.stops || s.stops.length < 2) continue;
+      if (s.affectation === "folga" || s.affectation === "ferias") continue;
+      if (!myShiftsByDate.has(s.date)) myShiftsByDate.set(s.date, []);
+      myShiftsByDate.get(s.date)!.push(s);
+    }
+
     const filtered = allShifts.filter((s) => {
       if (!s.availableForSwap) return false;
       if (s.date < today) return false;
@@ -608,6 +636,7 @@ export default function SwapsScreen() {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(s);
     }
+    const REST_MIN = 660;
     return Array.from(groups.values())
       .map((g) => g.sort((a, b) => a.startMinutes - b.startMinutes))
       .filter((g) => {
@@ -618,6 +647,20 @@ export default function SwapsScreen() {
             r.requesterId === user.id &&
             r.status !== "rejected",
         );
+      })
+      .filter((g) => {
+        const date = g[0].date;
+        const groupStart = g[0].startMinutes;
+        const groupEnd = Math.max(...g.map((s) => s.endMinutes));
+        const prevDate = isoAddDays(date, -1);
+        const nextDate = isoAddDays(date, 1);
+        for (const ps of myShiftsByDate.get(prevDate) ?? []) {
+          if (1440 + groupStart - ps.endMinutes < REST_MIN) return false;
+        }
+        for (const ns of myShiftsByDate.get(nextDate) ?? []) {
+          if (1440 + ns.startMinutes - groupEnd < REST_MIN) return false;
+        }
+        return true;
       })
       .sort((a, b) => a[0].date.localeCompare(b[0].date));
   }, [allShifts, user, members, swapRequests, today]);
@@ -646,15 +689,22 @@ export default function SwapsScreen() {
     [swapRequests, user],
   );
 
-  const handleRequest = async (shifts: ShiftWithCalc[]) => {
+  const handleRequest = (shifts: ShiftWithCalc[]) => {
     if (!shifts.length) return;
     const offerer = members.find((m) => m.id === shifts[0].crewMemberId);
     if (!offerer) return;
-    await requestSwap({
-      shifts,
-      offererName: formatDisplayName(offerer.name),
-      offererCrewId: offerer.crewId,
-      offererCategories: offerer.categories ?? [],
+    confirm({
+      title: "Pedir troca de serviço",
+      message: `Antes de enviar o pedido, fala diretamente com ${formatDisplayName(offerer.name)} e com a Expedição para combinarem a troca.\n\nEnviar o pedido não garante a aprovação.`,
+      confirmLabel: "Enviar pedido",
+      onConfirm: async () => {
+        await requestSwap({
+          shifts,
+          offererName: formatDisplayName(offerer.name),
+          offererCrewId: offerer.crewId,
+          offererCategories: offerer.categories ?? [],
+        });
+      },
     });
   };
 
@@ -662,6 +712,7 @@ export default function SwapsScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {modal}
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -728,6 +779,7 @@ export default function SwapsScreen() {
                 key={r.id}
                 req={r}
                 onCancel={() => cancelSwap(r.id)}
+                offererPhone={members.find((m) => m.id === r.offererId)?.phone}
               />
             ))}
           </View>
@@ -1025,5 +1077,23 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
+  },
+  phoneRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginHorizontal: 14,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  phoneText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    fontVariant: ["tabular-nums"],
+  },
+  phoneLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
   },
 });

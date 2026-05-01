@@ -29,6 +29,7 @@ import {
   AffectationType,
   affectationDisplay,
   displayDateToIso,
+  isoAddDays,
   isoToDisplayDate,
   parseTimeToMinutes,
   todayIso,
@@ -112,6 +113,7 @@ export default function NewShiftScreen() {
     end?: { location?: string; time?: string };
     range?: string;
     overlap?: string;
+    rest?: string;
     duplicate?: string;
   }>({});
 
@@ -237,6 +239,34 @@ export default function NewShiftScreen() {
         if (overlapping.length > 0) {
           const ex = overlapping[0];
           next.overlap = `Sobreposição com serviço existente das ${ex.stops[0].time} às ${ex.stops[ex.stops.length - 1].time}`;
+        }
+      }
+
+      if (startTimeMin != null && endTimeMin != null && iso && !next.range && !next.overlap) {
+        const REST_MIN = 660;
+        const prevDate = isoAddDays(iso, -1);
+        const nextDate = isoAddDays(iso, 1);
+        for (const s of shifts) {
+          if (s.id === editingId) continue;
+          if (s.affectation === "folga" || s.affectation === "ferias") continue;
+          if (!s.stops || s.stops.length < 2) continue;
+          if (s.date === prevDate) {
+            const gap = 1440 + startTimeMin - s.endMinutes;
+            if (gap < REST_MIN) {
+              const h = Math.floor(gap / 60);
+              const m = gap % 60;
+              next.rest = `Descanso insuficiente antes deste serviço: ${h}h${m ? String(m).padStart(2, "0") + "min" : ""} (mínimo 11h obrigatórias)`;
+              break;
+            }
+          } else if (s.date === nextDate) {
+            const gap = 1440 + s.startMinutes - endTimeMin;
+            if (gap < REST_MIN) {
+              const h = Math.floor(gap / 60);
+              const m = gap % 60;
+              next.rest = `Descanso insuficiente após este serviço: ${h}h${m ? String(m).padStart(2, "0") + "min" : ""} (mínimo 11h obrigatórias)`;
+              break;
+            }
+          }
         }
       }
     }
@@ -570,6 +600,13 @@ export default function NewShiftScreen() {
                     style={[styles.errorText, { color: colors.destructive }]}
                   >
                     {errors.overlap}
+                  </Text>
+                ) : null}
+                {errors.rest ? (
+                  <Text
+                    style={[styles.errorText, { color: colors.destructive }]}
+                  >
+                    {errors.rest}
                   </Text>
                 ) : null}
               </>

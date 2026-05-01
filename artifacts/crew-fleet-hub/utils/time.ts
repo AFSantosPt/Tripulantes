@@ -201,6 +201,12 @@ export function todayIso(): string {
   return `${y}-${m}-${d}`;
 }
 
+export function isoAddDays(iso: string, days: number): string {
+  const d = new Date(iso + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export function isoMonthKey(iso: string): string {
   return iso.slice(0, 7);
 }

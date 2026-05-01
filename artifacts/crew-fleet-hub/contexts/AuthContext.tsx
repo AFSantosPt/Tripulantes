@@ -35,6 +35,7 @@ export interface CrewMember {
   name: string;
   crewId: string;
   nickname?: string;
+  phone?: string;
   folgaGroup?: string;
   status: AccountStatus;
   isAdmin: boolean;
@@ -82,6 +83,7 @@ interface AuthState {
     next: string;
   }) => Promise<{ ok: true } | { ok: false; error: string }>;
   updateNickname: (nickname: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  updatePhone: (phone: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   updateFolgaGroup: (group: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   updateName: (name: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   adminUpdateName: (memberId: string, name: string) => Promise<{ ok: true } | { ok: false; error: string }>;
@@ -100,6 +102,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchMembers = useCallback(async (adminId: string) => {
     try {
       const res = await apiFetch("/api/auth/members", { memberId: adminId });
+      if (res.ok) {
+        const data = await res.json();
+        setMembers(data.members as CrewMember[]);
+      }
+    } catch {
+    }
+  }, []);
+
+  const fetchActiveMembers = useCallback(async (memberId: string) => {
+    try {
+      const res = await apiFetch("/api/auth/active-members", { memberId });
       if (res.ok) {
         const data = await res.json();
         setMembers(data.members as CrewMember[]);
@@ -132,6 +145,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSessionId(id);
             if (me.isAdmin) {
               await fetchMembers(id);
+            } else if (me.status === "active") {
+              await fetchActiveMembers(id);
             }
           } else {
             await AsyncStorage.removeItem(SESSION_KEY);
@@ -153,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsReady(true);
       }
     })();
-  }, [fetchMe, fetchMembers]);
+  }, [fetchMe, fetchMembers, fetchActiveMembers]);
 
   const persistSession = useCallback(
     async (member: CrewMember | null) => {
@@ -172,9 +187,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshMembers = useCallback(async () => {
     const id = sessionId ?? user?.id;
-    if (!id || !user?.isAdmin) return;
-    await fetchMembers(id);
-  }, [sessionId, user, fetchMembers]);
+    if (!id) return;
+    if (user?.isAdmin) {
+      await fetchMembers(id);
+    } else if (user?.status === "active") {
+      await fetchActiveMembers(id);
+    }
+  }, [sessionId, user, fetchMembers, fetchActiveMembers]);
 
   const signIn = useCallback<AuthState["signIn"]>(
     async (crewId, password) => {
@@ -189,14 +208,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!res.ok) return { ok: false, error: data.error ?? "Erro ao entrar" };
         const member = data.member as CrewMember;
         await persistSession(member);
-        if (member.isAdmin) await fetchMembers(member.id);
+        if (member.isAdmin) {
+          await fetchMembers(member.id);
+        } else if (member.status === "active") {
+          await fetchActiveMembers(member.id);
+        }
         return { ok: true, member };
       } catch (err) {
         const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
         return { ok: false, error: msg };
       }
     },
-    [persistSession, fetchMembers],
+    [persistSession, fetchMembers, fetchActiveMembers],
   );
 
   const signOut = useCallback(async () => {
@@ -353,6 +376,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user],
   );
 
+  const updatePhone = useCallback<AuthState["updatePhone"]>(
+    async (phone) => {
+      if (!user) return { ok: false, error: "Sessão inválida" };
+      try {
+        const res = await apiFetch("/api/auth/phone", {
+          method: "PATCH",
+          memberId: user.id,
+          body: JSON.stringify({ phone }),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, error: data.error ?? "Erro" };
+        setUser(data.member as CrewMember);
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
+        return { ok: false, error: msg };
+      }
+    },
+    [user],
+  );
+
   const updateFolgaGroup = useCallback<AuthState["updateFolgaGroup"]>(
     async (group) => {
       if (!user) return { ok: false, error: "Sessão inválida" };
@@ -438,6 +482,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updateCategories,
       changePassword,
       updateNickname,
+      updatePhone,
       updateFolgaGroup,
       updateName,
       adminUpdateName,
@@ -458,6 +503,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateCategories,
     changePassword,
     updateNickname,
+    updatePhone,
     updateFolgaGroup,
     updateName,
     adminUpdateName,

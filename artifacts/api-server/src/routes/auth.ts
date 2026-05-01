@@ -88,6 +88,17 @@ router.get("/auth/members", async (req, res) => {
   res.json({ members: members.map(sanitize) });
 });
 
+router.get("/auth/active-members", async (req, res) => {
+  const requesterId = req.headers["x-member-id"] as string | undefined;
+  if (!requesterId) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const requester = await findMemberById(requesterId);
+  if (!requester || requester.status !== "active") {
+    res.status(403).json({ error: "Sem permissão" }); return;
+  }
+  const members = await readMembers();
+  res.json({ members: members.filter((m) => m.status === "active").map(sanitize) });
+});
+
 router.get("/auth/me", async (req, res) => {
   const memberId = req.headers["x-member-id"] as string | undefined;
   if (!memberId) { res.status(404).json({ error: "Membro não encontrado" }); return; }
@@ -226,6 +237,17 @@ router.patch("/auth/nickname", async (req, res) => {
   const { nickname } = req.body ?? {};
   const trimmed = nickname?.trim() ?? "";
   const updated = await updateMember(requesterId, { nickname: trimmed || null as any });
+  res.json({ member: sanitize(updated!) });
+});
+
+router.patch("/auth/phone", async (req, res) => {
+  const requesterId = req.headers["x-member-id"] as string | undefined;
+  if (!requesterId) { res.status(403).json({ error: "Sessão inválida" }); return; }
+  const member = await findMemberById(requesterId);
+  if (!member || member.status !== "active") { res.status(403).json({ error: "Sessão inválida" }); return; }
+  const { phone } = req.body ?? {};
+  const trimmed = (phone ?? "").trim().replace(/\s+/g, "");
+  const updated = await updateMember(requesterId, { phone: trimmed || null as any });
   res.json({ member: sanitize(updated!) });
 });
 

@@ -15,6 +15,7 @@ export interface CrewMember {
   id: string;
   name: string;
   nickname?: string;
+  phone?: string;
   crewId: string;
   passwordHash: string;
   status: AccountStatus;
@@ -32,6 +33,7 @@ function rowToMember(row: any): CrewMember {
     id: row.id,
     name: row.name,
     nickname: row.nickname ?? undefined,
+    phone: row.phone ?? undefined,
     crewId: row.crew_id,
     passwordHash: row.password_hash,
     status: row.status as AccountStatus,
@@ -80,6 +82,7 @@ export async function updateMember(id: string, fields: Partial<Omit<CrewMember, 
   if (fields.status !== undefined)      { sets.push(`status=$${idx++}`);         vals.push(fields.status); }
   if (fields.isAdmin !== undefined)     { sets.push(`is_admin=$${idx++}`);       vals.push(fields.isAdmin); }
   if (fields.nickname !== undefined)           { sets.push(`nickname=$${idx++}`);                vals.push(fields.nickname ?? null); }
+  if (fields.phone !== undefined)              { sets.push(`phone=$${idx++}`);                   vals.push(fields.phone ?? null); }
   if (fields.categories !== undefined)         { sets.push(`categories=$${idx++}`);              vals.push(fields.categories); }
   if (fields.categoryOtherLabel !== undefined) { sets.push(`category_other_label=$${idx++}`);     vals.push(fields.categoryOtherLabel); }
   if (fields.folgaGroup !== undefined)         { sets.push(`folga_group=$${idx++}`);               vals.push(fields.folgaGroup ?? null); }

@@ -63,6 +63,59 @@ async function checkOverlap(
   return null;
 }
 
+function isoAddDays(iso: string, days: number): string {
+  const d = new Date(iso + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+async function checkRestPeriod(
+  memberId: string,
+  date: string,
+  stops: ShiftStop[],
+  excludeId?: string,
+): Promise<string | null> {
+  if (stops.length < 2) return null;
+  const newStart = parseMinutes(stops[0].time);
+  const newEnd = parseMinutes(stops[stops.length - 1].time);
+  if (newStart == null || newEnd == null) return null;
+
+  const REST_MIN = 660;
+  const prevDate = isoAddDays(date, -1);
+  const nextDate = isoAddDays(date, 1);
+
+  const params: any[] = [memberId, [prevDate, nextDate], Array.from(ABSENCE_TYPES)];
+  let sql = `SELECT date, stops FROM shifts
+    WHERE crew_member_id=$1 AND date=ANY($2) AND NOT affectation=ANY($3)`;
+  if (excludeId) { params.push(excludeId); sql += ` AND id!=$${params.length}`; }
+
+  const r = await pool.query(sql, params);
+  for (const row of r.rows) {
+    const s: ShiftStop[] = row.stops ?? [];
+    if (s.length < 2) continue;
+    const adjStart = parseMinutes(s[0].time);
+    const adjEnd = parseMinutes(s[s.length - 1].time);
+    if (adjStart == null || adjEnd == null) continue;
+
+    if (row.date === prevDate) {
+      const gap = 1440 + newStart - adjEnd;
+      if (gap < REST_MIN) {
+        const h = Math.floor(gap / 60);
+        const m = gap % 60;
+        return `Descanso insuficiente antes deste serviço: ${h}h${m ? String(m).padStart(2, "0") + "min" : ""} (mínimo 11h obrigatórias)`;
+      }
+    } else if (row.date === nextDate) {
+      const gap = 1440 + adjStart - newEnd;
+      if (gap < REST_MIN) {
+        const h = Math.floor(gap / 60);
+        const m = gap % 60;
+        return `Descanso insuficiente após este serviço: ${h}h${m ? String(m).padStart(2, "0") + "min" : ""} (mínimo 11h obrigatórias)`;
+      }
+    }
+  }
+  return null;
+}
+
 async function requireActiveMember(memberId: string | undefined) {
   if (!memberId) return null;
   const m = await findMemberById(memberId);
@@ -112,6 +165,8 @@ router.post("/shifts", async (req, res) => {
   if (!ABSENCE_TYPES.has(body.affectation)) {
     const overlap = await checkOverlap(member.id, body.date, body.stops);
     if (overlap) { res.status(409).json({ error: overlap }); return; }
+    const rest = await checkRestPeriod(member.id, body.date, body.stops);
+    if (rest) { res.status(409).json({ error: rest }); return; }
   }
   const id = newId();
   const r = await pool.query(
@@ -151,6 +206,8 @@ router.put("/shifts/:id", async (req, res) => {
   if (!ABSENCE_TYPES.has(body.affectation)) {
     const overlap = await checkOverlap(member.id, body.date, body.stops, req.params.id);
     if (overlap) { res.status(409).json({ error: overlap }); return; }
+    const rest = await checkRestPeriod(member.id, body.date, body.stops, req.params.id);
+    if (rest) { res.status(409).json({ error: rest }); return; }
   }
   const r = await pool.query(
     `UPDATE shifts SET date=$1,code=$2,vehicle_code=$3,vehicle_kind=$4,affectation=$5,affectation_label=$6,stops=$7,notes=$8,available_for_swap=$9,updated_at=NOW() WHERE id=$10 RETURNING *`,
