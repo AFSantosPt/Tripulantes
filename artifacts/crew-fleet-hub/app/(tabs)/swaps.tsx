@@ -20,6 +20,7 @@ import { ShiftStop, ShiftWithCalc, useShifts } from "@/contexts/ShiftsContext";
 import { SwapRequest, useSwaps } from "@/contexts/SwapsContext";
 import { useColors } from "@/hooks/useColors";
 import { formatDateShort, todayIso } from "@/utils/time";
+import { formatDisplayName } from "@/utils/nameFormat";
 
 function categoriesCompatible(a: CrewCategory[], b: CrewCategory[]): boolean {
   if (a.length === 0 || b.length === 0) return true;
@@ -661,7 +662,7 @@ export default function SwapsScreen() {
     if (!offerer) return;
     await requestSwap({
       shifts,
-      offererName: offerer.name,
+      offererName: formatDisplayName(offerer.name),
       offererCrewId: offerer.crewId,
       offererCategories: offerer.categories ?? [],
     });
@@ -718,7 +719,7 @@ export default function SwapsScreen() {
                 <AvailableDayCard
                   key={key}
                   shifts={group}
-                  offererName={offerer.name}
+                  offererName={formatDisplayName(offerer.name)}
                   offererCrewId={offerer.crewId}
                   offererCategories={offerer.categories ?? []}
                   onRequest={() => handleRequest(group)}

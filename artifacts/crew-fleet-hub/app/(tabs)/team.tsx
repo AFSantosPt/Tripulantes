@@ -21,6 +21,7 @@ import {
   useAuth,
 } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { formatDisplayName } from "@/utils/nameFormat";
 
 type Section =
   | { kind: "header"; key: string; label: string; meta?: string }
@@ -448,7 +449,7 @@ export default function TeamScreen() {
                         { color: colors.foreground },
                       ]}
                     >
-                      {m.name}{m.nickname ? ` (${m.nickname})` : ""}
+                      {formatDisplayName(m.name)}{m.nickname ? ` (${m.nickname})` : ""}
                     </Text>
                     <Text
                       style={[
@@ -573,7 +574,7 @@ export default function TeamScreen() {
                         { color: colors.foreground },
                       ]}
                     >
-                      {m.name}{m.nickname ? ` (${m.nickname})` : ""}{isSelf ? "  (tu)" : ""}
+                      {formatDisplayName(m.name)}{m.nickname ? ` (${m.nickname})` : ""}{isSelf ? "  (tu)" : ""}
                     </Text>
                     {m.isAdmin ? (
                       <View
