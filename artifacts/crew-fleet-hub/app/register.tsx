@@ -28,7 +28,9 @@ export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { registerRequest, isFirstSetup } = useAuth();
-  const [name, setName] = useState<string>("");
+  const [firstName, setFirstName] = useState<string>("");
+  const [middleName, setMiddleName] = useState<string>("");
+  const [lastName, setLastName] = useState<string>("");
   const [crewId, setCrewId] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirm, setConfirm] = useState<string>("");
@@ -53,6 +55,12 @@ export default function RegisterScreen() {
 
   const handleSubmit = async () => {
     setError(null);
+    const first = firstName.trim();
+    const middle = middleName.trim();
+    const last = lastName.trim();
+    if (!first) { setError("Primeiro nome é obrigatório"); return; }
+    if (!last) { setError("Apelido é obrigatório"); return; }
+    const fullName = [first, middle, last].filter(Boolean).join(" ");
     if (password !== confirm) {
       setError("As passwords não coincidem");
       return;
@@ -63,7 +71,7 @@ export default function RegisterScreen() {
     }
     setSubmitting(true);
     try {
-      const result = await registerRequest({ name, crewId, password, categories });
+      const result = await registerRequest({ name: fullName, crewId, password, categories });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -134,13 +142,31 @@ export default function RegisterScreen() {
 
           <View style={styles.form}>
             <TextField
-              label="Nome"
-              placeholder="Ex: João Silva"
-              value={name}
-              onChangeText={setName}
+              label="Primeiro nome"
+              placeholder="Ex: João"
+              value={firstName}
+              onChangeText={setFirstName}
               autoCapitalize="words"
               returnKeyType="next"
-              testID="register-name"
+              testID="register-first-name"
+            />
+            <TextField
+              label="Nome do meio (opcional)"
+              placeholder="Ex: Manuel"
+              value={middleName}
+              onChangeText={setMiddleName}
+              autoCapitalize="words"
+              returnKeyType="next"
+              testID="register-middle-name"
+            />
+            <TextField
+              label="Apelido"
+              placeholder="Ex: Silva"
+              value={lastName}
+              onChangeText={setLastName}
+              autoCapitalize="words"
+              returnKeyType="next"
+              testID="register-last-name"
             />
             <TextField
               label="Nº Tripulante"
