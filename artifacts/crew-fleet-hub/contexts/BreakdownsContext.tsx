@@ -62,6 +62,7 @@ interface BreakdownsState {
     fleetNumber: string;
     description: string;
   }) => Promise<Breakdown>;
+  editBreakdown: (id: string, input: { vehicleKind: VehicleKind; fleetNumber: string; description: string }) => Promise<{ ok: boolean; reason?: string }>;
   confirmRepair: (id: string) => Promise<{ ok: boolean; reason?: string }>;
   removeBreakdown: (id: string) => Promise<void>;
   addPhoto: (
@@ -117,6 +118,29 @@ export function BreakdownsProvider({
       const created = data.breakdown as Breakdown;
       setBreakdowns((prev) => [created, ...prev]);
       return created;
+    },
+    [user],
+  );
+
+  const editBreakdown = useCallback<BreakdownsState["editBreakdown"]>(
+    async (id, input) => {
+      if (!user) return { ok: false, reason: "Sem sessão iniciada" };
+      try {
+        const res = await apiFetch(`/api/breakdowns/${id}`, {
+          method: "PATCH",
+          memberId: user.id,
+          body: JSON.stringify(input),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, reason: data.error };
+        setBreakdowns((prev) =>
+          prev.map((b) => (b.id === id ? (data.breakdown as Breakdown) : b)),
+        );
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Erro de ligação";
+        return { ok: false, reason: msg };
+      }
     },
     [user],
   );
@@ -220,6 +244,7 @@ export function BreakdownsProvider({
       isReady,
       byId: (id: string) => breakdowns.find((b) => b.id === id),
       reportBreakdown,
+      editBreakdown,
       confirmRepair,
       removeBreakdown,
       addPhoto,
@@ -230,6 +255,7 @@ export function BreakdownsProvider({
     breakdowns,
     isReady,
     reportBreakdown,
+    editBreakdown,
     confirmRepair,
     removeBreakdown,
     addPhoto,

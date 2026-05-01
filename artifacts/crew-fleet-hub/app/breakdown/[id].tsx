@@ -207,24 +207,43 @@ export default function BreakdownDetailScreen() {
           >
             <Feather name="arrow-left" size={20} color={colors.foreground} />
           </Pressable>
-          {isReporter ? (
-            <Pressable
-              onPress={handleDelete}
-              style={({ pressed }) => [
-                styles.iconBtn,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                  borderRadius: colors.radius,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              <Feather name="trash-2" size={18} color={colors.destructive} />
-            </Pressable>
-          ) : (
-            <View style={{ width: 44 }} />
-          )}
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {user?.isAdmin ? (
+              <Pressable
+                onPress={() => router.push(`/breakdown-edit?id=${breakdown.id}`)}
+                style={({ pressed }) => [
+                  styles.iconBtn,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                    borderRadius: colors.radius,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+              >
+                <Feather name="edit-2" size={18} color={colors.foreground} />
+              </Pressable>
+            ) : null}
+            {isReporter ? (
+              <Pressable
+                onPress={handleDelete}
+                style={({ pressed }) => [
+                  styles.iconBtn,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                    borderRadius: colors.radius,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+              >
+                <Feather name="trash-2" size={18} color={colors.destructive} />
+              </Pressable>
+            ) : null}
+            {!user?.isAdmin && !isReporter ? (
+              <View style={{ width: 44 }} />
+            ) : null}
+          </View>
         </View>
 
         <View

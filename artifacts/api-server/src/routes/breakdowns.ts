@@ -80,6 +80,23 @@ router.post("/breakdowns/:id/confirm", async (req, res) => {
   res.json({ breakdown: rowToBreakdown(r.rows[0]) });
 });
 
+router.patch("/breakdowns/:id", async (req, res) => {
+  const member = await requireActiveMember(req.headers["x-member-id"] as string);
+  if (!member || !member.isAdmin) { res.status(403).json({ error: "Só o administrador pode editar avarias" }); return; }
+  const existing = await pool.query("SELECT * FROM breakdowns WHERE id=$1", [req.params.id]);
+  if (!existing.rows[0]) { res.status(404).json({ error: "Avaria não encontrada" }); return; }
+  const { vehicleKind, fleetNumber, description } = req.body ?? {};
+  if (!vehicleKind || !fleetNumber?.trim() || !description?.trim()) {
+    res.status(400).json({ error: "Campos obrigatórios em falta" }); return;
+  }
+  const r = await pool.query(
+    "UPDATE breakdowns SET vehicle_kind=$1, fleet_number=$2, description=$3 WHERE id=$4 RETURNING *",
+    [vehicleKind, String(fleetNumber).trim(), String(description).trim(), req.params.id],
+  );
+  broadcast("breakdowns");
+  res.json({ breakdown: rowToBreakdown(r.rows[0]) });
+});
+
 router.delete("/breakdowns/:id", async (req, res) => {
   const member = await requireActiveMember(req.headers["x-member-id"] as string);
   if (!member) { res.status(403).json({ error: "Sem permissão" }); return; }
