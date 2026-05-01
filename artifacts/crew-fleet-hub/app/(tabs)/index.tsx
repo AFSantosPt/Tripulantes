@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -487,6 +488,7 @@ function affectationBadgeColors(
 function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) {
   const colors = useColors();
   const router = useRouter();
+  const { removeShift } = useShifts();
   const codeLabel = shift.code?.trim() || "Sem código";
   const vehicleLabel = shift.vehicleCode?.trim();
   const affLabel =
@@ -495,21 +497,30 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
   const isAbsence = shift.affectation === "folga" || shift.affectation === "ferias";
   const badge = affectationBadgeColors(shift.affectation, colors);
 
+  const handleDelete = () => {
+    const proceed = () => removeShift(shift.id);
+    if (Platform.OS === "web") {
+      if (window.confirm("Apagar este serviço? Esta ação não pode ser revertida.")) proceed();
+      return;
+    }
+    Alert.alert(
+      "Apagar serviço",
+      "Esta ação não pode ser revertida.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Apagar", style: "destructive", onPress: proceed },
+      ],
+    );
+  };
+
   return (
-    <Pressable
-      onLongPress={() =>
-        router.push({
-          pathname: "/shift-new",
-          params: { date: shift.date },
-        })
-      }
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.card,
         {
           backgroundColor: colors.card,
           borderColor: colors.border,
           borderRadius: colors.radius,
-          opacity: pressed ? 0.96 : 1,
         },
       ]}
     >
@@ -627,7 +638,40 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
         </View>
       ) : null}
 
-    </Pressable>
+      <View style={[styles.cardActions, { borderTopColor: colors.border }]}>
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/shift-new",
+              params: { id: shift.id, date: shift.date },
+            })
+          }
+          style={({ pressed }) => [
+            styles.cardActionBtn,
+            { opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Feather name="edit-2" size={15} color={colors.mutedForeground} />
+          <Text style={[styles.cardActionLabel, { color: colors.mutedForeground }]}>
+            Editar
+          </Text>
+        </Pressable>
+        <View style={[styles.cardActionDivider, { backgroundColor: colors.border }]} />
+        <Pressable
+          onPress={handleDelete}
+          style={({ pressed }) => [
+            styles.cardActionBtn,
+            { opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Feather name="trash-2" size={15} color={colors.destructive} />
+          <Text style={[styles.cardActionLabel, { color: colors.destructive }]}>
+            Apagar
+          </Text>
+        </Pressable>
+      </View>
+
+    </View>
   );
 }
 
@@ -857,6 +901,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_700Bold",
     marginTop: 2,
+  },
+  cardActions: {
+    flexDirection: "row",
+    borderTopWidth: 1,
+    paddingTop: 8,
+    gap: 0,
+  },
+  cardActionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 6,
+  },
+  cardActionLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  cardActionDivider: {
+    width: 1,
+    marginVertical: 4,
   },
   daySwapToggle: {
     flexDirection: "row",

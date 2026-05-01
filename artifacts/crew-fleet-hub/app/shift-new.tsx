@@ -21,6 +21,8 @@ import {
   ShiftWithCalc,
   useShifts,
 } from "@/contexts/ShiftsContext";
+import { VehicleKind } from "@/contexts/BreakdownsContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import {
   ABSENCE_TYPES,
@@ -31,6 +33,33 @@ import {
   parseTimeToMinutes,
   todayIso,
 } from "@/utils/time";
+
+const CATEGORY_VEHICLE_MAP: Record<string, VehicleKind[]> = {
+  motorista: ["autocarro"],
+  "guarda-freio": ["eletrico"],
+  ascensor: ["ascensor"],
+  outro: ["autocarro", "eletrico", "ascensor"],
+};
+
+function vehicleOptionsForCategories(
+  categories: string[],
+): { value: VehicleKind; label: string }[] {
+  const kindSet = new Set<VehicleKind>();
+  for (const cat of categories) {
+    for (const kind of CATEGORY_VEHICLE_MAP[cat] ?? []) kindSet.add(kind);
+  }
+  if (kindSet.size === 0) {
+    kindSet.add("autocarro");
+    kindSet.add("eletrico");
+    kindSet.add("ascensor");
+  }
+  const all: { value: VehicleKind; label: string }[] = [
+    { value: "autocarro", label: "Autocarro" },
+    { value: "eletrico", label: "Eléctrico" },
+    { value: "ascensor", label: "Ascensor" },
+  ];
+  return all.filter((o) => kindSet.has(o.value));
+}
 
 interface DraftStop {
   location: string;
@@ -43,8 +72,13 @@ export default function NewShiftScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const { shifts, addShift, updateShift, removeShift, byId } = useShifts();
   const params = useLocalSearchParams<{ date?: string; id?: string }>();
+
+  const vehicleOptions = vehicleOptionsForCategories(user?.categories ?? []);
+  const defaultVehicleKind: VehicleKind | undefined =
+    vehicleOptions.length === 1 ? vehicleOptions[0].value : undefined;
 
   const initialDate =
     typeof params.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(params.date)
@@ -60,6 +94,7 @@ export default function NewShiftScreen() {
   );
   const [code, setCode] = useState<string>("");
   const [vehicleCode, setVehicleCode] = useState<string>("");
+  const [vehicleKind, setVehicleKind] = useState<VehicleKind | undefined>(defaultVehicleKind);
   const [affectation, setAffectation] = useState<AffectationType>("normal");
   const [start, setStart] = useState<DraftStop>(EMPTY_STOP);
   const [end, setEnd] = useState<DraftStop>(EMPTY_STOP);
@@ -85,6 +120,7 @@ export default function NewShiftScreen() {
     setDateInput(isoToDisplayDate(existing.date));
     setCode(existing.code ?? "");
     setVehicleCode(existing.vehicleCode ?? "");
+    setVehicleKind((existing.vehicleKind as VehicleKind | undefined) ?? defaultVehicleKind);
     setAffectation(existing.affectation);
     const first = existing.stops[0];
     const last = existing.stops[existing.stops.length - 1];
@@ -126,6 +162,7 @@ export default function NewShiftScreen() {
     setEditingId(null);
     setCode("");
     setVehicleCode("");
+    setVehicleKind(defaultVehicleKind);
     setAffectation("normal");
     setStart(EMPTY_STOP);
     setEnd(EMPTY_STOP);
@@ -197,6 +234,7 @@ export default function NewShiftScreen() {
         date: iso!,
         code: isAbsenceType ? undefined : code.trim() || undefined,
         vehicleCode: isAbsenceType ? undefined : vehicleCode.trim() || undefined,
+        vehicleKind: isAbsenceType ? undefined : vehicleKind,
         affectation,
         stops: cleanedStops,
         notes: isAbsenceType ? undefined : notes.trim() || undefined,
@@ -419,6 +457,53 @@ export default function NewShiftScreen() {
                     />
                   </View>
                 </View>
+
+                {vehicleOptions.length > 1 ? (
+                  <View style={{ gap: 6 }}>
+                    <Text style={[styles.label, { color: colors.foreground }]}>
+                      Tipo de veículo
+                    </Text>
+                    <View style={styles.chipRow}>
+                      {vehicleOptions.map((opt) => {
+                        const selected = vehicleKind === opt.value;
+                        return (
+                          <Pressable
+                            key={opt.value}
+                            onPress={() =>
+                              setVehicleKind(selected ? undefined : opt.value)
+                            }
+                            style={({ pressed }) => [
+                              styles.chip,
+                              {
+                                backgroundColor: selected
+                                  ? colors.primary
+                                  : colors.card,
+                                borderColor: selected
+                                  ? colors.primary
+                                  : colors.border,
+                                borderRadius: colors.radius,
+                                opacity: pressed ? 0.8 : 1,
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.chipLabel,
+                                {
+                                  color: selected
+                                    ? "#fff"
+                                    : colors.foreground,
+                                },
+                              ]}
+                            >
+                              {opt.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ) : null}
 
                 <StopCard
                   label="Início"
@@ -972,6 +1057,20 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   actionBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+  },
+  chipLabel: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
   },
