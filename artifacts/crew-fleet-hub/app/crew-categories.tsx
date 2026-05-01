@@ -22,8 +22,8 @@ import {
 import { useColors } from "@/hooks/useColors";
 
 const CATEGORY_DESCRIPTIONS: Partial<Record<CrewCategory, string>> = {
-  motorista: "Conduz autocarros · pode reportar avarias de autocarro",
-  "guarda-freio": "Opera elétricos · pode reportar avarias de elétrico",
+  motorista: "Conduz autocarros · pode reportar avarias",
+  "guarda-freio": "Opera eléctricos · pode reportar avarias",
 };
 
 export default function CrewCategoriesScreen() {

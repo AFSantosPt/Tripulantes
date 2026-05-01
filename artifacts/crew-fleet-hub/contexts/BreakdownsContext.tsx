@@ -19,8 +19,8 @@ const POLL_INTERVAL_MS = 30000;
 export type VehicleKind = "eletrico" | "autocarro";
 
 export const VEHICLE_LABELS: Record<VehicleKind, string> = {
-  eletrico: "Elétrico",
-  autocarro: "Autocarro",
+  eletrico: "Eléctricos",
+  autocarro: "Autocarros",
 };
 
 export interface Confirmation {
