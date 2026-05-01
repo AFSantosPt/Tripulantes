@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   Platform,
   Pressable,
@@ -316,10 +316,12 @@ function SentRequestCard({
   req,
   onCancel,
   offererPhone,
+  isAdmin,
 }: {
   req: SwapRequest;
   onCancel: () => void;
   offererPhone?: string;
+  isAdmin?: boolean;
 }) {
   const colors = useColors();
   const { confirm, modal } = useConfirm();
@@ -447,7 +449,7 @@ function SentRequestCard({
           </Text>
         </View>
       ) : null}
-      {req.status === "pending" ? (
+      {(req.status === "pending" || isAdmin) ? (
         <Pressable
           onPress={handleCancel}
           style={({ pressed }) => [
@@ -462,7 +464,7 @@ function SentRequestCard({
           <Text
             style={[styles.cancelBtnText, { color: colors.mutedForeground }]}
           >
-            Cancelar pedido
+            {isAdmin && req.status !== "pending" ? "Eliminar (admin)" : "Cancelar pedido"}
           </Text>
         </Pressable>
       ) : null}
@@ -579,6 +581,80 @@ function ReceivedRequestCard({
   );
 }
 
+function AdminHistoryCard({
+  req,
+  onDelete,
+}: {
+  req: SwapRequest;
+  onDelete: () => void;
+}) {
+  const colors = useColors();
+  const { confirm, modal } = useConfirm();
+
+  const statusColor =
+    req.status === "confirmed"
+      ? colors.success
+      : req.status === "rejected"
+        ? colors.destructive
+        : colors.primary;
+  const statusLabel =
+    req.status === "confirmed" ? "Confirmada" : req.status === "rejected" ? "Recusada" : "Pendente";
+
+  const handleDelete = () =>
+    confirm({
+      title: "Eliminar troca",
+      message: `Eliminar a troca de ${formatDateShort(req.offerShiftDate)} entre ${req.offererName} e ${req.requesterName}?`,
+      confirmLabel: "Eliminar",
+      destructive: true,
+      onConfirm: onDelete,
+    });
+
+  return (
+    <View
+      style={[
+        styles.pastCard,
+        { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius },
+      ]}
+    >
+      {modal}
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.pastCardDate, { color: colors.primary }]}>
+            {formatDateShort(req.offerShiftDate)}{req.offerShiftCode ? `  ·  ${req.offerShiftCode}` : ""}
+          </Text>
+          <Text style={[styles.pastCardName, { color: colors.foreground }]}>
+            {req.offererName}
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}> Nº {req.offererCrewId}</Text>
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginVertical: 2 }}>
+            <Feather name="arrow-right" size={11} color={colors.mutedForeground} />
+            <Text style={[styles.pastCardName, { color: colors.foreground }]}>
+              {req.requesterName}
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}> Nº {req.requesterCrewId}</Text>
+            </Text>
+          </View>
+        </View>
+        <View style={{ alignItems: "flex-end", gap: 8 }}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: statusColor + "1A", borderColor: statusColor },
+            ]}
+          >
+            <Text style={[styles.statusBadgeText, { color: statusColor }]}>{statusLabel}</Text>
+          </View>
+          <Pressable
+            onPress={handleDelete}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}
+          >
+            <Feather name="trash-2" size={16} color={colors.destructive} />
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function SwapsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -591,8 +667,12 @@ export default function SwapsScreen() {
   const { user, members } = useAuth();
   const { confirm, modal } = useConfirm();
   const { allShifts } = useShifts();
-  const { swapRequests, requestSwap, confirmSwap, rejectSwap, cancelSwap } =
+  const { swapRequests, adminHistory, requestSwap, confirmSwap, rejectSwap, cancelSwap, fetchAdminHistory } =
     useSwaps();
+
+  useEffect(() => {
+    if (user?.isAdmin) fetchAdminHistory();
+  }, [user?.isAdmin, fetchAdminHistory]);
 
   const today = todayIso();
 
@@ -794,6 +874,7 @@ export default function SwapsScreen() {
                 req={r}
                 onCancel={() => cancelSwap(r.id)}
                 offererPhone={members.find((m) => m.id === r.offererId)?.phone}
+                isAdmin={!!user?.isAdmin}
               />
             ))}
           </View>
@@ -859,6 +940,26 @@ export default function SwapsScreen() {
                 );
               })}
             </View>
+          </>
+        ) : null}
+
+        {user?.isAdmin && adminHistory.length > 0 ? (
+          <>
+            <SectionHeader title="Histórico completo" />
+            <View style={{ gap: 8 }}>
+              {adminHistory.map((r) => (
+                <AdminHistoryCard
+                  key={r.id}
+                  req={r}
+                  onDelete={() => cancelSwap(r.id)}
+                />
+              ))}
+            </View>
+          </>
+        ) : user?.isAdmin && adminHistory.length === 0 ? (
+          <>
+            <SectionHeader title="Histórico completo" />
+            <EmptySection label="Sem trocas registadas." />
           </>
         ) : null}
       </ScrollView>

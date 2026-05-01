@@ -60,6 +60,16 @@ router.get("/swaps", async (req, res) => {
   res.json({ swapRequests: r.rows.map(rowToSwap) });
 });
 
+router.get("/swaps/history", async (req, res) => {
+  const member = await requireActiveMember(req.headers["x-member-id"] as string);
+  if (!member) { res.status(403).json({ error: "Sem permissão" }); return; }
+  if (!member.isAdmin) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const r = await pool.query(
+    "SELECT * FROM swaps ORDER BY offer_shift_date DESC, created_at DESC",
+  );
+  res.json({ swapRequests: r.rows.map(rowToSwap) });
+});
+
 router.post("/swaps", async (req, res) => {
   const member = await requireActiveMember(req.headers["x-member-id"] as string);
   if (!member) { res.status(403).json({ error: "Sem permissão" }); return; }

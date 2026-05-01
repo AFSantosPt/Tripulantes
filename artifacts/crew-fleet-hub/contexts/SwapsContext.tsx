@@ -48,6 +48,7 @@ export interface SwapRequest {
 
 interface SwapsState {
   swapRequests: SwapRequest[];
+  adminHistory: SwapRequest[];
   isReady: boolean;
   requestSwap: (input: {
     shifts: ShiftWithCalc[];
@@ -58,6 +59,7 @@ interface SwapsState {
   confirmSwap: (id: string) => Promise<void>;
   rejectSwap: (id: string) => Promise<void>;
   cancelSwap: (id: string) => Promise<void>;
+  fetchAdminHistory: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -66,6 +68,7 @@ const SwapsContext = createContext<SwapsState | null>(null);
 export function SwapsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [swapRequests, setSwapRequests] = useState<SwapRequest[]>([]);
+  const [adminHistory, setAdminHistory] = useState<SwapRequest[]>([]);
   const [isReady, setIsReady] = useState(false);
 
   const fetchSwaps = useCallback(async () => {
@@ -139,7 +142,9 @@ export function SwapsProvider({ children }: { children: React.ReactNode }) {
         });
         const data = await res.json();
         if (!res.ok) return { ok: false, reason: data.error ?? "Erro" };
-        setSwapRequests((prev) => [...prev, data.swapRequest as SwapRequest]);
+        const newSwap = data.swapRequest as SwapRequest;
+        setSwapRequests((prev) => [...prev, newSwap]);
+        setAdminHistory((prev) => [newSwap, ...prev]);
         return { ok: true };
       } catch (err) {
         const msg = err instanceof NetworkError ? err.message : "Erro de ligação";
@@ -159,11 +164,9 @@ export function SwapsProvider({ children }: { children: React.ReactNode }) {
         });
         if (res.ok) {
           const data = await res.json();
-          setSwapRequests((prev) =>
-            prev.map((r) =>
-              r.id === id ? (data.swapRequest as SwapRequest) : r,
-            ),
-          );
+          const updated = data.swapRequest as SwapRequest;
+          setSwapRequests((prev) => prev.map((r) => r.id === id ? updated : r));
+          setAdminHistory((prev) => prev.map((r) => r.id === id ? updated : r));
         }
       } catch {}
     },
@@ -180,11 +183,9 @@ export function SwapsProvider({ children }: { children: React.ReactNode }) {
         });
         if (res.ok) {
           const data = await res.json();
-          setSwapRequests((prev) =>
-            prev.map((r) =>
-              r.id === id ? (data.swapRequest as SwapRequest) : r,
-            ),
-          );
+          const updated = data.swapRequest as SwapRequest;
+          setSwapRequests((prev) => prev.map((r) => r.id === id ? updated : r));
+          setAdminHistory((prev) => prev.map((r) => r.id === id ? updated : r));
         }
       } catch {}
     },
@@ -199,30 +200,47 @@ export function SwapsProvider({ children }: { children: React.ReactNode }) {
           method: "DELETE",
           memberId: user.id,
         });
-        if (res.ok)
+        if (res.ok) {
           setSwapRequests((prev) => prev.filter((r) => r.id !== id));
+          setAdminHistory((prev) => prev.filter((r) => r.id !== id));
+        }
       } catch {}
     },
     [user],
   );
 
+  const fetchAdminHistory = useCallback(async () => {
+    if (!user?.isAdmin) return;
+    try {
+      const res = await apiFetch("/api/swaps/history", { memberId: user.id });
+      if (res.ok) {
+        const data = await res.json();
+        setAdminHistory(data.swapRequests as SwapRequest[]);
+      }
+    } catch {}
+  }, [user]);
+
   const value = useMemo<SwapsState>(
     () => ({
       swapRequests,
+      adminHistory,
       isReady,
       requestSwap,
       confirmSwap,
       rejectSwap,
       cancelSwap,
+      fetchAdminHistory,
       refresh: fetchSwaps,
     }),
     [
       swapRequests,
+      adminHistory,
       isReady,
       requestSwap,
       confirmSwap,
       rejectSwap,
       cancelSwap,
+      fetchAdminHistory,
       fetchSwaps,
     ],
   );
