@@ -27,6 +27,42 @@ function rowToShift(row: any): Shift {
   };
 }
 
+function parseMinutes(time: string): number | null {
+  const m = /^(\d{1,3}):([0-5]?\d)$/.exec(time);
+  if (!m) return null;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
+async function checkOverlap(
+  memberId: string,
+  date: string,
+  stops: ShiftStop[],
+  excludeId?: string,
+): Promise<string | null> {
+  if (stops.length < 2) return null;
+  const newStart = parseMinutes(stops[0].time);
+  const newEnd = parseMinutes(stops[stops.length - 1].time);
+  if (newStart == null || newEnd == null || newEnd <= newStart) return null;
+
+  const params: any[] = [memberId, date, Array.from(ABSENCE_TYPES)];
+  let sql = `SELECT stops FROM shifts
+    WHERE crew_member_id=$1 AND date=$2 AND NOT affectation=ANY($3)`;
+  if (excludeId) { params.push(excludeId); sql += ` AND id!=$${params.length}`; }
+
+  const r = await pool.query(sql, params);
+  for (const row of r.rows) {
+    const s: ShiftStop[] = row.stops ?? [];
+    if (s.length < 2) continue;
+    const exStart = parseMinutes(s[0].time);
+    const exEnd = parseMinutes(s[s.length - 1].time);
+    if (exStart == null || exEnd == null) continue;
+    if (newStart < exEnd && exStart < newEnd) {
+      return `Sobreposição com serviço existente das ${s[0].time} às ${s[s.length - 1].time}`;
+    }
+  }
+  return null;
+}
+
 async function requireActiveMember(memberId: string | undefined) {
   if (!memberId) return null;
   const m = await findMemberById(memberId);
@@ -73,10 +109,14 @@ router.post("/shifts", async (req, res) => {
   if (dup.rows.length > 0) {
     res.status(409).json({ error: "Já existe um serviço neste dia com as mesmas horas de início e fim." }); return;
   }
+  if (!ABSENCE_TYPES.has(body.affectation)) {
+    const overlap = await checkOverlap(member.id, body.date, body.stops);
+    if (overlap) { res.status(409).json({ error: overlap }); return; }
+  }
   const id = newId();
   const r = await pool.query(
-    `INSERT INTO shifts (id,crew_member_id,date,code,vehicle_code,vehicle_kind,affectation,affectation_label,stops,notes,available_for_swap,created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW()) RETURNING *`,
+    `INSERT INTO shifts (id,crew_member_id,date,code,vehicle_code,vehicle_kind,affectation,affectation_label,stops,notes,available_for_swap,created_at,updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW()) RETURNING *`,
     [id, member.id, body.date, body.code ?? null, body.vehicleCode ?? null, body.vehicleKind ?? null,
      body.affectation, body.affectationLabel ?? null, JSON.stringify(body.stops), body.notes ?? null, body.availableForSwap ?? false],
   );
@@ -108,8 +148,12 @@ router.put("/shifts/:id", async (req, res) => {
   if (dup.rows.length > 0) {
     res.status(409).json({ error: "Já existe outro serviço neste dia com as mesmas horas de início e fim." }); return;
   }
+  if (!ABSENCE_TYPES.has(body.affectation)) {
+    const overlap = await checkOverlap(member.id, body.date, body.stops, req.params.id);
+    if (overlap) { res.status(409).json({ error: overlap }); return; }
+  }
   const r = await pool.query(
-    `UPDATE shifts SET date=$1,code=$2,vehicle_code=$3,vehicle_kind=$4,affectation=$5,affectation_label=$6,stops=$7,notes=$8,available_for_swap=$9 WHERE id=$10 RETURNING *`,
+    `UPDATE shifts SET date=$1,code=$2,vehicle_code=$3,vehicle_kind=$4,affectation=$5,affectation_label=$6,stops=$7,notes=$8,available_for_swap=$9,updated_at=NOW() WHERE id=$10 RETURNING *`,
     [body.date, body.code ?? null, body.vehicleCode ?? null, body.vehicleKind ?? null,
      body.affectation, body.affectationLabel ?? null, JSON.stringify(body.stops),
      body.notes ?? null, body.availableForSwap ?? false, req.params.id],
