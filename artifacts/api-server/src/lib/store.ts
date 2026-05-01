@@ -26,6 +26,7 @@ export interface CrewMember {
   createdAt: string;
   approvedAt?: string;
   approvedById?: string;
+  lastSeenAt?: string;
 }
 
 function rowToMember(row: any): CrewMember {
@@ -34,6 +35,7 @@ function rowToMember(row: any): CrewMember {
     name: row.name,
     nickname: row.nickname ?? undefined,
     phone: row.phone ?? undefined,
+    lastSeenAt: row.last_seen_at ? (row.last_seen_at instanceof Date ? row.last_seen_at.toISOString() : String(row.last_seen_at)) : undefined,
     crewId: row.crew_id,
     passwordHash: row.password_hash,
     status: row.status as AccountStatus,

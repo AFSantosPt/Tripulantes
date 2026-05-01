@@ -7,6 +7,11 @@ import { findMemberById } from "../lib/store";
 export type SwapStatus = "pending" | "confirmed" | "rejected";
 
 function todayIso(): string { return new Date().toISOString().slice(0, 10); }
+function yesterdayIso(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
 
 function rowToSwap(row: any) {
   return {
@@ -44,9 +49,13 @@ const router = Router();
 router.get("/swaps", async (req, res) => {
   const member = await requireActiveMember(req.headers["x-member-id"] as string);
   if (!member) { res.status(403).json({ error: "Sem permissão" }); return; }
+  pool.query(
+    "DELETE FROM swaps WHERE offer_shift_date < $1",
+    [yesterdayIso()],
+  ).catch(() => {});
   const r = await pool.query(
     "SELECT * FROM swaps WHERE offer_shift_date >= $1 ORDER BY created_at DESC",
-    [todayIso()],
+    [yesterdayIso()],
   );
   res.json({ swapRequests: r.rows.map(rowToSwap) });
 });
@@ -57,6 +66,7 @@ router.post("/swaps", async (req, res) => {
   const body = req.body;
   if (!body.offererId || !body.offerShiftDate) { res.status(400).json({ error: "Dados em falta" }); return; }
   if (body.offererId === member.id) { res.status(400).json({ error: "Não podes trocar contigo próprio" }); return; }
+  if (body.offerShiftDate <= todayIso()) { res.status(400).json({ error: "Não é permitido pedir trocas para o dia de hoje ou passados" }); return; }
   const shiftIds: string[] = body.offerShiftIds ?? (body.offerShiftId ? [body.offerShiftId] : []);
   if (shiftIds.length > 0) {
     const dup = await pool.query(

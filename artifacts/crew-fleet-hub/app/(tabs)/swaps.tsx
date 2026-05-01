@@ -621,7 +621,7 @@ export default function SwapsScreen() {
 
     const filtered = allShifts.filter((s) => {
       if (!s.availableForSwap) return false;
-      if (s.date < today) return false;
+      if (s.date <= today) return false;
       if (s.crewMemberId === user.id) return false;
       if (!myWorkDates.has(s.date)) return false;
       const offerer = members.find((m) => m.id === s.crewMemberId);
@@ -669,24 +669,38 @@ export default function SwapsScreen() {
     () =>
       user
         ? swapRequests
-            .filter((r) => r.requesterId === user.id)
+            .filter((r) => r.requesterId === user.id && r.offerShiftDate > today)
             .sort(
               (a, b) =>
                 new Date(b.createdAt).getTime() -
                 new Date(a.createdAt).getTime(),
             )
         : [],
-    [swapRequests, user],
+    [swapRequests, user, today],
   );
 
   const receivedRequests = useMemo(
     () =>
       user
         ? swapRequests.filter(
-            (r) => r.offererId === user.id && r.status === "pending",
+            (r) => r.offererId === user.id && r.status === "pending" && r.offerShiftDate > today,
           )
         : [],
-    [swapRequests, user],
+    [swapRequests, user, today],
+  );
+
+  const pastSwaps = useMemo(
+    () =>
+      user
+        ? swapRequests
+            .filter(
+              (r) =>
+                r.offerShiftDate <= today &&
+                (r.requesterId === user.id || r.offererId === user.id),
+            )
+            .sort((a, b) => b.offerShiftDate.localeCompare(a.offerShiftDate))
+        : [],
+    [swapRequests, user, today],
   );
 
   const handleRequest = (shifts: ShiftWithCalc[]) => {
@@ -784,6 +798,69 @@ export default function SwapsScreen() {
             ))}
           </View>
         )}
+
+        {pastSwaps.length > 0 ? (
+          <>
+            <SectionHeader title="Trocas passadas" />
+            <View style={{ gap: 8 }}>
+              {pastSwaps.map((r) => {
+                const isRequester = r.requesterId === user!.id;
+                const otherName = isRequester ? r.offererName : r.requesterName;
+                const otherCrewId = isRequester ? r.offererCrewId : r.requesterCrewId;
+                const statusColor =
+                  r.status === "confirmed"
+                    ? colors.success
+                    : r.status === "rejected"
+                      ? colors.destructive
+                      : colors.mutedForeground;
+                const statusLabel =
+                  r.status === "confirmed"
+                    ? "Confirmada"
+                    : r.status === "rejected"
+                      ? "Recusada"
+                      : "Pendente";
+                return (
+                  <View
+                    key={r.id}
+                    style={[
+                      styles.pastCard,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                        borderRadius: colors.radius,
+                      },
+                    ]}
+                  >
+                    <View style={styles.pastCardRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.pastCardDate, { color: colors.primary }]}>
+                          {formatDateShort(r.offerShiftDate)}
+                          {r.offerShiftCode ? `  ·  ${r.offerShiftCode}` : ""}
+                        </Text>
+                        <Text style={[styles.pastCardName, { color: colors.foreground }]}>
+                          {isRequester ? "Pedido a " : "Pedido de "}{otherName}
+                        </Text>
+                        <Text style={[styles.pastCardMeta, { color: colors.mutedForeground }]}>
+                          Nº {otherCrewId}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          { backgroundColor: statusColor + "1A", borderColor: statusColor },
+                        ]}
+                      >
+                        <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                          {statusLabel}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -1077,6 +1154,31 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
+  },
+  pastCard: {
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 0,
+  },
+  pastCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  pastCardDate: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    marginBottom: 2,
+  },
+  pastCardName: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+  },
+  pastCardMeta: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 1,
   },
   phoneRow: {
     flexDirection: "row",

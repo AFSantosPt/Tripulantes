@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { hashPassword, verifyPassword } from "../lib/hash";
+import pool from "../lib/db";
 import {
   type CrewCategory,
   createMember,
@@ -104,6 +105,7 @@ router.get("/auth/me", async (req, res) => {
   if (!memberId) { res.status(404).json({ error: "Membro não encontrado" }); return; }
   const found = await findMemberById(memberId);
   if (!found) { res.status(404).json({ error: "Membro não encontrado" }); return; }
+  pool.query("UPDATE members SET last_seen_at=NOW() WHERE id=$1", [memberId]).catch(() => {});
   res.json({ member: sanitize(found) });
 });
 

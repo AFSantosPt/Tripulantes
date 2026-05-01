@@ -22,6 +22,7 @@ import {
 } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { formatDisplayName } from "@/utils/nameFormat";
+import { formatRelative } from "@/utils/time";
 
 type Section =
   | { kind: "header"; key: string; label: string; meta?: string }
@@ -672,6 +673,14 @@ export default function TeamScreen() {
                   >
                     Nº {m.crewId}
                   </Text>
+                  {isAdmin ? (
+                    <View style={styles.lastSeenRow}>
+                      <Feather name="clock" size={11} color={colors.mutedForeground} />
+                      <Text style={[styles.memberLastSeen, { color: colors.mutedForeground }]}>
+                        {m.lastSeenAt ? `Visto ${formatRelative(m.lastSeenAt)}` : "Nunca ligado"}
+                      </Text>
+                    </View>
+                  ) : null}
                   {m.categories && m.categories.length > 0 ? (
                     <CategoryChips
                       categories={m.categories}
@@ -982,6 +991,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_500Medium",
     marginTop: 2,
+  },
+  lastSeenRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  memberLastSeen: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
   },
   adminBadge: {
     flexDirection: "row",

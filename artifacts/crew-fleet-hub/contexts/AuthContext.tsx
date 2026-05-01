@@ -44,6 +44,7 @@ export interface CrewMember {
   createdAt: string;
   approvedAt?: string;
   approvedById?: string;
+  lastSeenAt?: string;
 }
 
 export type RegisterResult =
