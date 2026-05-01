@@ -3,11 +3,15 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   FlatList,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,9 +19,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState } from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmModal";
 import {
+  ALL_CREW_CATEGORIES,
   CREW_CATEGORY_LABELS,
   CrewCategory,
   CrewMember,
+  EditMemberFields,
   useAuth,
 } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -28,7 +34,157 @@ type Section =
   | { kind: "header"; key: string; label: string; meta?: string }
   | { kind: "pending"; key: string; member: CrewMember }
   | { kind: "active"; key: string; member: CrewMember }
+  | { kind: "inactive"; key: string; member: CrewMember }
   | { kind: "empty"; key: string; label: string };
+
+function MemberEditModal({
+  member,
+  visible,
+  onClose,
+  onSave,
+}: {
+  member: CrewMember | null;
+  visible: boolean;
+  onClose: () => void;
+  onSave: (fields: EditMemberFields) => Promise<void>;
+}) {
+  const colors = useColors();
+  const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [crewId, setCrewId] = useState("");
+  const [folgaGroup, setFolgaGroup] = useState("");
+  const [categories, setCategories] = useState<CrewCategory[]>([]);
+  const [categoryOtherLabel, setCategoryOtherLabel] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (member) {
+      setName(member.name);
+      setNickname(member.nickname ?? "");
+      setCrewId(member.crewId);
+      setFolgaGroup(member.folgaGroup ?? "");
+      setCategories(member.categories ?? []);
+      setCategoryOtherLabel(member.categoryOtherLabel ?? "");
+      setError(null);
+    }
+  }, [member]);
+
+  const toggleCategory = (cat: CrewCategory) => {
+    setCategories((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+    );
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) { setError("O nome não pode ser vazio"); return; }
+    setSaving(true);
+    setError(null);
+    await onSave({ name, nickname, crewId, folgaGroup, categories, categoryOtherLabel });
+    setSaving(false);
+  };
+
+  const inputStyle = {
+    backgroundColor: colors.muted,
+    borderColor: colors.border,
+    color: colors.foreground,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+  };
+  const labelStyle = { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.mutedForeground, marginBottom: 4 };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12, borderBottomWidth: 1, borderColor: colors.border }}>
+          <Pressable onPress={onClose} style={{ marginRight: 12, padding: 4 }}>
+            <Feather name="x" size={22} color={colors.foreground} />
+          </Pressable>
+          <Text style={{ flex: 1, fontSize: 17, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
+            Editar {member ? formatDisplayName(member.name) : ""}
+          </Text>
+          <Pressable
+            onPress={handleSave}
+            disabled={saving}
+            style={{ backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, opacity: saving ? 0.6 : 1 }}
+          >
+            <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+              {saving ? "A guardar…" : "Guardar"}
+            </Text>
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+          {error ? (
+            <View style={{ backgroundColor: colors.destructive + "1A", borderRadius: 8, padding: 12 }}>
+              <Text style={{ color: colors.destructive, fontFamily: "Inter_500Medium", fontSize: 13 }}>{error}</Text>
+            </View>
+          ) : null}
+
+          <View style={{ gap: 4 }}>
+            <Text style={labelStyle}>Nome completo *</Text>
+            <TextInput style={inputStyle} value={name} onChangeText={setName} placeholder="Nome" placeholderTextColor={colors.mutedForeground} autoCapitalize="words" />
+          </View>
+
+          <View style={{ gap: 4 }}>
+            <Text style={labelStyle}>Alcunha</Text>
+            <TextInput style={inputStyle} value={nickname} onChangeText={setNickname} placeholder="Alcunha (opcional)" placeholderTextColor={colors.mutedForeground} autoCapitalize="words" />
+          </View>
+
+          <View style={{ gap: 4 }}>
+            <Text style={labelStyle}>Nº Tripulante</Text>
+            <TextInput style={inputStyle} value={crewId} onChangeText={setCrewId} placeholder="Nº colaborador" placeholderTextColor={colors.mutedForeground} autoCapitalize="none" keyboardType="numeric" />
+          </View>
+
+          <View style={{ gap: 4 }}>
+            <Text style={labelStyle}>Grupo de folga</Text>
+            <TextInput style={inputStyle} value={folgaGroup} onChangeText={setFolgaGroup} placeholder="Ex: A, B, C…" placeholderTextColor={colors.mutedForeground} autoCapitalize="characters" />
+          </View>
+
+          <View style={{ gap: 8 }}>
+            <Text style={labelStyle}>Categorias</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {ALL_CREW_CATEGORIES.map((cat) => {
+                const selected = categories.includes(cat);
+                return (
+                  <Pressable
+                    key={cat}
+                    onPress={() => toggleCategory(cat)}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 20,
+                      borderWidth: 1.5,
+                      borderColor: selected ? colors.primary : colors.border,
+                      backgroundColor: selected ? colors.primary + "1A" : colors.muted,
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: selected ? colors.primary : colors.mutedForeground }}>
+                      {CREW_CATEGORY_LABELS[cat]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {categories.includes("outro") ? (
+              <TextInput
+                style={[inputStyle, { marginTop: 4 }]}
+                value={categoryOtherLabel}
+                onChangeText={setCategoryOtherLabel}
+                placeholder="Descrição da categoria 'Outro'"
+                placeholderTextColor={colors.mutedForeground}
+                autoCapitalize="sentences"
+              />
+            ) : null}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
 
 export default function TeamScreen() {
   const colors = useColors();
@@ -38,16 +194,23 @@ export default function TeamScreen() {
     user,
     pendingMembers,
     activeMembers,
+    inactiveMembers,
     approveMember,
     rejectMember,
     toggleAdmin,
     removeMember,
+    editMember,
+    deactivateMember,
+    reactivateMember,
+    resetMemberPassword,
     signOut,
     refreshMembers,
   } = useAuth();
 
   const [refreshing, setRefreshing] = useState(false);
-  const { confirm, modal } = useConfirm();
+  const [editingMember, setEditingMember] = useState<CrewMember | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const { confirm, alert, modal } = useConfirm();
 
   useEffect(() => {
     if (!user?.isAdmin) return;
@@ -100,6 +263,12 @@ export default function TeamScreen() {
   activeMembers.forEach((m) => {
     sections.push({ kind: "active", key: `a-${m.id}`, member: m });
   });
+  if (isAdmin && inactiveMembers.length > 0) {
+    sections.push({ kind: "header", key: "h-inactive", label: "Inativos", meta: `${inactiveMembers.length}` });
+    inactiveMembers.forEach((m) => {
+      sections.push({ kind: "inactive", key: `i-${m.id}`, member: m });
+    });
+  }
 
   const confirmAction = (
     title: string,
@@ -109,9 +278,69 @@ export default function TeamScreen() {
     confirm({ title, message, confirmLabel: "Confirmar", destructive: true, onConfirm });
   };
 
+  const handleEditSave = async (fields: EditMemberFields) => {
+    if (!editingMember) return;
+    const result = await editMember(editingMember.id, fields);
+    if (result.ok) {
+      setEditModalVisible(false);
+      setEditingMember(null);
+    } else {
+      alert({ title: "Erro", message: result.error });
+    }
+  };
+
+  const handleDeactivate = (m: CrewMember) => {
+    confirm({
+      title: "Desativar conta",
+      message: `${formatDisplayName(m.name)} deixa de poder aceder à app. Podes reativar a qualquer momento.`,
+      confirmLabel: "Desativar",
+      destructive: true,
+      onConfirm: async () => {
+        const result = await deactivateMember(m.id);
+        if (!result.ok) alert({ title: "Erro", message: result.error });
+      },
+    });
+  };
+
+  const handleReactivate = (m: CrewMember) => {
+    confirm({
+      title: "Reativar conta",
+      message: `${formatDisplayName(m.name)} volta a ter acesso à app.`,
+      confirmLabel: "Reativar",
+      destructive: false,
+      onConfirm: async () => {
+        const result = await reactivateMember(m.id);
+        if (!result.ok) alert({ title: "Erro", message: result.error });
+      },
+    });
+  };
+
+  const handleResetPassword = (m: CrewMember) => {
+    confirm({
+      title: "Redefinir password",
+      message: `Gerar uma password temporária para ${formatDisplayName(m.name)}? O tripulante terá de alterar na próxima sessão.`,
+      confirmLabel: "Redefinir",
+      destructive: true,
+      onConfirm: async () => {
+        const result = await resetMemberPassword(m.id);
+        if (result.ok) {
+          alert({ title: "Password temporária", message: `A nova password de ${formatDisplayName(m.name)} é:\n\n${result.tempPassword}\n\nComunica este código ao tripulante.` });
+        } else {
+          alert({ title: "Erro", message: result.error });
+        }
+      },
+    });
+  };
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {modal}
+      <MemberEditModal
+        member={editingMember}
+        visible={editModalVisible}
+        onClose={() => { setEditModalVisible(false); setEditingMember(null); }}
+        onSave={handleEditSave}
+      />
       <FlatList<Section>
         data={sections}
         keyExtractor={(s) => s.key}
@@ -598,6 +827,60 @@ export default function TeamScreen() {
               </View>
             );
           }
+          if (item.kind === "inactive") {
+            const m = item.member;
+            return (
+              <View
+                style={[
+                  styles.memberCard,
+                  { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius, opacity: 0.7 },
+                ]}
+              >
+                <View style={styles.memberRow}>
+                  <View style={[styles.avatar, { backgroundColor: colors.muted }]}>
+                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_700Bold", fontSize: 16 }}>
+                      {m.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={[styles.memberName, { color: colors.mutedForeground }]}>
+                      {formatDisplayName(m.name)}{m.nickname ? ` (${m.nickname})` : ""}
+                    </Text>
+                    <Text style={[styles.memberMeta, { color: colors.mutedForeground }]}>Nº {m.crewId}</Text>
+                    <Text style={[styles.memberMeta, { color: colors.mutedForeground }]}>Conta desativada</Text>
+                  </View>
+                </View>
+                <View style={styles.actionRow}>
+                  <Pressable
+                    onPress={() => handleReactivate(m)}
+                    style={({ pressed }) => [
+                      styles.actionBtnGhost,
+                      { borderColor: colors.primary, borderRadius: colors.radius, opacity: pressed ? 0.85 : 1 },
+                    ]}
+                  >
+                    <Feather name="user-check" size={14} color={colors.primary} />
+                    <Text style={[styles.actionLabelSm, { color: colors.primary }]}>Reativar</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() =>
+                      confirmAction(
+                        "Remover tripulante",
+                        `Remover ${formatDisplayName(m.name)} da equipa? Esta ação não pode ser desfeita.`,
+                        () => removeMember(m.id),
+                      )
+                    }
+                    style={({ pressed }) => [
+                      styles.actionBtnDanger,
+                      { borderColor: colors.destructive, borderRadius: colors.radius, opacity: pressed ? 0.85 : 1 },
+                    ]}
+                  >
+                    <Feather name="trash-2" size={14} color={colors.destructive} />
+                    <Text style={[styles.actionLabelSm, { color: colors.destructive }]}>Remover</Text>
+                  </Pressable>
+                </View>
+              </View>
+            );
+          }
           const m = item.member;
           const isSelf = m.id === user?.id;
           return (
@@ -695,58 +978,19 @@ export default function TeamScreen() {
               {isAdmin && !isSelf ? (
                 <View style={styles.actionRow}>
                   <Pressable
-                    onPress={() =>
-                      router.push({
-                        pathname: "/edit-name",
-                        params: { memberId: m.id },
-                      })
-                    }
+                    onPress={() => { setEditingMember(m); setEditModalVisible(true); }}
                     style={({ pressed }) => [
                       styles.actionBtnGhost,
-                      {
-                        borderColor: colors.border,
-                        borderRadius: colors.radius,
-                        opacity: pressed ? 0.85 : 1,
-                      },
+                      { borderColor: colors.border, borderRadius: colors.radius, opacity: pressed ? 0.85 : 1 },
                     ]}
                   >
                     <Feather name="edit-2" size={14} color={colors.foreground} />
-                    <Text style={[styles.actionLabelSm, { color: colors.foreground }]}>
-                      Nome
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() =>
-                      router.push({
-                        pathname: "/crew-categories",
-                        params: { id: m.id },
-                      })
-                    }
-                    style={({ pressed }) => [
-                      styles.actionBtnGhost,
-                      {
-                        borderColor: colors.border,
-                        borderRadius: colors.radius,
-                        opacity: pressed ? 0.85 : 1,
-                      },
-                    ]}
-                  >
-                    <Feather name="tag" size={14} color={colors.foreground} />
-                    <Text
-                      style={[
-                        styles.actionLabelSm,
-                        { color: colors.foreground },
-                      ]}
-                    >
-                      Categorias
-                    </Text>
+                    <Text style={[styles.actionLabelSm, { color: colors.foreground }]}>Editar</Text>
                   </Pressable>
                   <Pressable
                     onPress={() =>
                       confirmAction(
-                        m.isAdmin
-                          ? "Remover administrador"
-                          : "Tornar administrador",
+                        m.isAdmin ? "Remover administrador" : "Tornar administrador",
                         m.isAdmin
                           ? `${m.name} deixa de poder aprovar pedidos.`
                           : `${m.name} passa a poder aprovar pedidos e gerir a equipa.`,
@@ -755,57 +999,33 @@ export default function TeamScreen() {
                     }
                     style={({ pressed }) => [
                       styles.actionBtnGhost,
-                      {
-                        borderColor: colors.border,
-                        borderRadius: colors.radius,
-                        opacity: pressed ? 0.85 : 1,
-                      },
+                      { borderColor: colors.border, borderRadius: colors.radius, opacity: pressed ? 0.85 : 1 },
                     ]}
                   >
-                    <Feather
-                      name={m.isAdmin ? "shield-off" : "shield"}
-                      size={14}
-                      color={colors.foreground}
-                    />
-                    <Text
-                      style={[
-                        styles.actionLabelSm,
-                        { color: colors.foreground },
-                      ]}
-                    >
-                      {m.isAdmin ? "Rem. admin" : "Tornar admin"}
+                    <Feather name={m.isAdmin ? "shield-off" : "shield"} size={14} color={colors.foreground} />
+                    <Text style={[styles.actionLabelSm, { color: colors.foreground }]}>
+                      {m.isAdmin ? "Rem. admin" : "Admin"}
                     </Text>
                   </Pressable>
                   <Pressable
-                    onPress={() =>
-                      confirmAction(
-                        "Remover tripulante",
-                        `Remover ${m.name} da equipa? Esta ação não pode ser desfeita.`,
-                        () => removeMember(m.id),
-                      )
-                    }
+                    onPress={() => handleResetPassword(m)}
                     style={({ pressed }) => [
-                      styles.actionBtnDanger,
-                      {
-                        borderColor: colors.destructive,
-                        borderRadius: colors.radius,
-                        opacity: pressed ? 0.85 : 1,
-                      },
+                      styles.actionBtnGhost,
+                      { borderColor: colors.border, borderRadius: colors.radius, opacity: pressed ? 0.85 : 1 },
                     ]}
                   >
-                    <Feather
-                      name="trash-2"
-                      size={14}
-                      color={colors.destructive}
-                    />
-                    <Text
-                      style={[
-                        styles.actionLabelSm,
-                        { color: colors.destructive },
-                      ]}
-                    >
-                      Remover
-                    </Text>
+                    <Feather name="key" size={14} color={colors.foreground} />
+                    <Text style={[styles.actionLabelSm, { color: colors.foreground }]}>Password</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleDeactivate(m)}
+                    style={({ pressed }) => [
+                      styles.actionBtnDanger,
+                      { borderColor: colors.destructive, borderRadius: colors.radius, opacity: pressed ? 0.85 : 1 },
+                    ]}
+                  >
+                    <Feather name="user-x" size={14} color={colors.destructive} />
+                    <Text style={[styles.actionLabelSm, { color: colors.destructive }]}>Desativar</Text>
                   </Pressable>
                 </View>
               ) : null}

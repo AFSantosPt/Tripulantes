@@ -8,7 +8,7 @@ const DEFAULT_ADMIN = {
   password: "andres91",
 };
 
-export type AccountStatus = "pending" | "active";
+export type AccountStatus = "pending" | "active" | "inactive";
 export type CrewCategory = "guarda-freio" | "motorista" | "outro";
 
 export interface CrewMember {

@@ -12,7 +12,7 @@ import { NetworkError, apiFetch } from "@/utils/apiClient";
 
 const SESSION_KEY = "@tripulante-gestao/session/v2";
 
-export type AccountStatus = "pending" | "active";
+export type AccountStatus = "pending" | "active" | "inactive";
 
 export type CrewCategory = "guarda-freio" | "motorista" | "ascensor" | "outro";
 
@@ -55,11 +55,21 @@ export type SignInResult =
   | { ok: true; member: CrewMember }
   | { ok: false; error: string };
 
+export interface EditMemberFields {
+  name?: string;
+  nickname?: string;
+  crewId?: string;
+  categories?: CrewCategory[];
+  categoryOtherLabel?: string;
+  folgaGroup?: string;
+}
+
 interface AuthState {
   user: CrewMember | null;
   members: CrewMember[];
   pendingMembers: CrewMember[];
   activeMembers: CrewMember[];
+  inactiveMembers: CrewMember[];
   isReady: boolean;
   isFirstSetup: boolean;
   signIn: (crewId: string, password: string) => Promise<SignInResult>;
@@ -74,6 +84,10 @@ interface AuthState {
   rejectMember: (id: string) => Promise<void>;
   toggleAdmin: (id: string) => Promise<void>;
   removeMember: (id: string) => Promise<void>;
+  editMember: (id: string, fields: EditMemberFields) => Promise<{ ok: true } | { ok: false; error: string }>;
+  deactivateMember: (id: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  reactivateMember: (id: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  resetMemberPassword: (id: string) => Promise<{ ok: true; tempPassword: string } | { ok: false; error: string }>;
   updateCategories: (
     memberId: string,
     categories: CrewCategory[],
@@ -440,6 +454,88 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user],
   );
 
+  const editMember = useCallback<AuthState["editMember"]>(
+    async (id, fields) => {
+      if (!user?.isAdmin) return { ok: false, error: "Sem permissão" };
+      try {
+        const res = await apiFetch(`/api/auth/members/${id}`, {
+          method: "PATCH",
+          memberId: user.id,
+          body: JSON.stringify(fields),
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, error: data.error ?? "Erro" };
+        const updated = data.member as CrewMember;
+        if (id === user.id) setUser(updated);
+        await fetchMembers(user.id);
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
+        return { ok: false, error: msg };
+      }
+    },
+    [user, fetchMembers],
+  );
+
+  const deactivateMember = useCallback<AuthState["deactivateMember"]>(
+    async (id) => {
+      if (!user?.isAdmin) return { ok: false, error: "Sem permissão" };
+      try {
+        const res = await apiFetch(`/api/auth/members/${id}/deactivate`, {
+          method: "PATCH",
+          memberId: user.id,
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, error: data.error ?? "Erro" };
+        await fetchMembers(user.id);
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
+        return { ok: false, error: msg };
+      }
+    },
+    [user, fetchMembers],
+  );
+
+  const reactivateMember = useCallback<AuthState["reactivateMember"]>(
+    async (id) => {
+      if (!user?.isAdmin) return { ok: false, error: "Sem permissão" };
+      try {
+        const res = await apiFetch(`/api/auth/members/${id}/reactivate`, {
+          method: "PATCH",
+          memberId: user.id,
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, error: data.error ?? "Erro" };
+        await fetchMembers(user.id);
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
+        return { ok: false, error: msg };
+      }
+    },
+    [user, fetchMembers],
+  );
+
+  const resetMemberPassword = useCallback<AuthState["resetMemberPassword"]>(
+    async (id) => {
+      if (!user?.isAdmin) return { ok: false, error: "Sem permissão" };
+      try {
+        const res = await apiFetch(`/api/auth/members/${id}/reset-password`, {
+          method: "POST",
+          memberId: user.id,
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, error: data.error ?? "Erro" };
+        return { ok: true, tempPassword: data.tempPassword as string };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
+        return { ok: false, error: msg };
+      }
+    },
+    [user],
+  );
+
   const adminUpdateName = useCallback<AuthState["adminUpdateName"]>(
     async (memberId, name) => {
       if (!user) return { ok: false, error: "Sessão inválida" };
@@ -466,11 +562,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthState>(() => {
     const pending = members.filter((m) => m.status === "pending");
     const active = members.filter((m) => m.status === "active");
+    const inactive = members.filter((m) => m.status === "inactive");
     return {
       user,
       members,
       pendingMembers: pending,
       activeMembers: active,
+      inactiveMembers: inactive,
       isReady,
       isFirstSetup,
       signIn,
@@ -480,6 +578,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       rejectMember,
       toggleAdmin,
       removeMember,
+      editMember,
+      deactivateMember,
+      reactivateMember,
+      resetMemberPassword,
       updateCategories,
       changePassword,
       updateNickname,
@@ -501,6 +603,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     rejectMember,
     toggleAdmin,
     removeMember,
+    editMember,
+    deactivateMember,
+    reactivateMember,
+    resetMemberPassword,
     updateCategories,
     changePassword,
     updateNickname,

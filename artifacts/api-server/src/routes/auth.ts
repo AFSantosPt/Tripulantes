@@ -43,6 +43,9 @@ router.post("/auth/signin", async (req, res) => {
   if (found.status === "pending") {
     res.status(403).json({ error: "Conta ainda não aprovada por um tripulante autorizado" }); return;
   }
+  if (found.status === "inactive") {
+    res.status(403).json({ error: "Conta desativada. Contacta um administrador." }); return;
+  }
   res.json({ member: sanitize(found) });
 });
 
@@ -251,6 +254,80 @@ router.patch("/auth/phone", async (req, res) => {
   const trimmed = (phone ?? "").trim().replace(/\s+/g, "");
   const updated = await updateMember(requesterId, { phone: trimmed || null as any });
   res.json({ member: sanitize(updated!) });
+});
+
+router.patch("/auth/members/:id", async (req, res) => {
+  const requesterId = req.headers["x-member-id"] as string | undefined;
+  if (!requesterId) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const admin = await findMemberById(requesterId);
+  if (!admin || admin.status !== "active" || !admin.isAdmin) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const target = await findMemberById(req.params.id);
+  if (!target) { res.status(404).json({ error: "Membro não encontrado" }); return; }
+  const { name, nickname, crewId, categories, categoryOtherLabel, folgaGroup } = req.body ?? {};
+  if (name !== undefined && !name?.trim()) { res.status(400).json({ error: "O nome não pode ser vazio" }); return; }
+  if (crewId !== undefined) {
+    const normalized = normalizeCrewId(crewId);
+    const existing = await findMemberByCrewId(normalized);
+    if (existing && existing.id !== req.params.id) { res.status(409).json({ error: "Nº Tripulante já existe" }); return; }
+  }
+  const fields: Parameters<typeof updateMember>[1] = {};
+  if (name !== undefined) fields.name = name.trim();
+  if (nickname !== undefined) fields.nickname = (nickname?.trim() || null) as any;
+  if (crewId !== undefined) fields.crewId = normalizeCrewId(crewId);
+  if (folgaGroup !== undefined) fields.folgaGroup = (folgaGroup?.trim() || null) as any;
+  if (Array.isArray(categories)) {
+    const validCats = (categories as string[]).filter((c): c is CrewCategory =>
+      ALL_CREW_CATEGORIES.includes(c as CrewCategory),
+    );
+    fields.categories = validCats;
+    fields.categoryOtherLabel = validCats.includes("outro")
+      ? (typeof categoryOtherLabel === "string" ? categoryOtherLabel.trim() || null : null) as any
+      : null as any;
+  }
+  const updated = await updateMember(req.params.id, fields);
+  res.json({ member: sanitize(updated!) });
+});
+
+router.patch("/auth/members/:id/deactivate", async (req, res) => {
+  const requesterId = req.headers["x-member-id"] as string | undefined;
+  if (!requesterId) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const admin = await findMemberById(requesterId);
+  if (!admin || admin.status !== "active" || !admin.isAdmin) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const { id } = req.params;
+  if (id === admin.id) { res.status(400).json({ error: "Não podes desativar a tua própria conta" }); return; }
+  const target = await findMemberById(id);
+  if (!target) { res.status(404).json({ error: "Membro não encontrado" }); return; }
+  if (target.isAdmin) {
+    const members = await readMembers();
+    const remainingAdmins = members.filter((m) => m.status === "active" && m.isAdmin && m.id !== id).length;
+    if (remainingAdmins === 0) { res.status(400).json({ error: "Não podes desativar o único administrador" }); return; }
+  }
+  const updated = await updateMember(id, { status: "inactive" });
+  res.json({ member: sanitize(updated!) });
+});
+
+router.patch("/auth/members/:id/reactivate", async (req, res) => {
+  const requesterId = req.headers["x-member-id"] as string | undefined;
+  if (!requesterId) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const admin = await findMemberById(requesterId);
+  if (!admin || admin.status !== "active" || !admin.isAdmin) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const target = await findMemberById(req.params.id);
+  if (!target) { res.status(404).json({ error: "Membro não encontrado" }); return; }
+  const updated = await updateMember(req.params.id, { status: "active" });
+  res.json({ member: sanitize(updated!) });
+});
+
+router.post("/auth/members/:id/reset-password", async (req, res) => {
+  const requesterId = req.headers["x-member-id"] as string | undefined;
+  if (!requesterId) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const admin = await findMemberById(requesterId);
+  if (!admin || admin.status !== "active" || !admin.isAdmin) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const target = await findMemberById(req.params.id);
+  if (!target) { res.status(404).json({ error: "Membro não encontrado" }); return; }
+  const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+  const tempPassword = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  await updateMember(req.params.id, { passwordHash: hashPassword(tempPassword) });
+  res.json({ tempPassword });
 });
 
 router.post("/auth/change-password", async (req, res) => {
