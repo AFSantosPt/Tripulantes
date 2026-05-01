@@ -9,7 +9,7 @@ import React, {
 
 import { CrewCategory, useAuth } from "@/contexts/AuthContext";
 import { ShiftStop, ShiftWithCalc } from "@/contexts/ShiftsContext";
-import { apiFetch } from "@/utils/apiClient";
+import { NetworkError, apiFetch } from "@/utils/apiClient";
 import { todayIso } from "@/utils/time";
 
 const POLL_INTERVAL_MS = 30000;
@@ -141,8 +141,9 @@ export function SwapsProvider({ children }: { children: React.ReactNode }) {
         if (!res.ok) return { ok: false, reason: data.error ?? "Erro" };
         setSwapRequests((prev) => [...prev, data.swapRequest as SwapRequest]);
         return { ok: true };
-      } catch {
-        return { ok: false, reason: "Erro de ligação" };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Erro de ligação";
+        return { ok: false, reason: msg };
       }
     },
     [user],

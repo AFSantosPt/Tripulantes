@@ -8,7 +8,7 @@ import React, {
   useState,
 } from "react";
 
-import { apiFetch } from "@/utils/apiClient";
+import { NetworkError, apiFetch } from "@/utils/apiClient";
 
 const SESSION_KEY = "@tripulante-gestao/session/v2";
 
@@ -183,8 +183,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await persistSession(member);
         if (member.isAdmin) await fetchMembers(member.id);
         return { ok: true, member };
-      } catch {
-        return { ok: false, error: "Sem ligação ao servidor" };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
+        return { ok: false, error: msg };
       }
     },
     [persistSession, fetchMembers],
@@ -208,8 +209,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await persistSession(member);
         }
         return { ok: true, autoActivated: data.autoActivated, member };
-      } catch {
-        return { ok: false, error: "Sem ligação ao servidor" };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
+        return { ok: false, error: msg };
       }
     },
     [persistSession],
@@ -314,8 +316,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!res.ok) return { ok: false, error: data.error ?? "Erro" };
         setUser(data.member as CrewMember);
         return { ok: true };
-      } catch {
-        return { ok: false, error: "Sem ligação ao servidor" };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Sem ligação ao servidor";
+        return { ok: false, error: msg };
       }
     },
     [user],

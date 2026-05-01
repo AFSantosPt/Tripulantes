@@ -8,7 +8,7 @@ import React, {
 } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/utils/apiClient";
+import { NetworkError, apiFetch } from "@/utils/apiClient";
 
 export const BREAKDOWN_PHOTO_LIFETIME_DAYS = 14;
 export const BREAKDOWN_MAX_PHOTOS = 3;
@@ -135,8 +135,9 @@ export function BreakdownsProvider({
           prev.map((b) => (b.id === id ? (data.breakdown as Breakdown) : b)),
         );
         return { ok: true };
-      } catch {
-        return { ok: false, reason: "Erro de ligação" };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Erro de ligação";
+        return { ok: false, reason: msg };
       }
     },
     [user],
@@ -173,8 +174,9 @@ export function BreakdownsProvider({
           ),
         );
         return { ok: true };
-      } catch {
-        return { ok: false, reason: "Erro de ligação" };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Erro de ligação";
+        return { ok: false, reason: msg };
       }
     },
     [user],
