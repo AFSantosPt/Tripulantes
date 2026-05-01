@@ -10,6 +10,7 @@ interface ShiftStop { location: string; time: string; }
 
 interface Shift {
   id: string; crewMemberId: string; date: string; code?: string; vehicleCode?: string;
+  vehicleKind?: string;
   affectation: string; affectationLabel?: string; stops: ShiftStop[];
   notes?: string; availableForSwap?: boolean; createdAt: string;
 }
@@ -18,6 +19,7 @@ function rowToShift(row: any): Shift {
   return {
     id: row.id, crewMemberId: row.crew_member_id, date: row.date,
     code: row.code ?? undefined, vehicleCode: row.vehicle_code ?? undefined,
+    vehicleKind: row.vehicle_kind ?? undefined,
     affectation: row.affectation, affectationLabel: row.affectation_label ?? undefined,
     stops: row.stops ?? [], notes: row.notes ?? undefined,
     availableForSwap: row.available_for_swap ?? false,
@@ -73,10 +75,10 @@ router.post("/shifts", async (req, res) => {
   }
   const id = newId();
   const r = await pool.query(
-    `INSERT INTO shifts (id,crew_member_id,date,code,vehicle_code,affectation,affectation_label,stops,notes,available_for_swap,created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()) RETURNING *`,
-    [id, member.id, body.date, body.code ?? null, body.vehicleCode ?? null, body.affectation,
-     body.affectationLabel ?? null, JSON.stringify(body.stops), body.notes ?? null, body.availableForSwap ?? false],
+    `INSERT INTO shifts (id,crew_member_id,date,code,vehicle_code,vehicle_kind,affectation,affectation_label,stops,notes,available_for_swap,created_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW()) RETURNING *`,
+    [id, member.id, body.date, body.code ?? null, body.vehicleCode ?? null, body.vehicleKind ?? null,
+     body.affectation, body.affectationLabel ?? null, JSON.stringify(body.stops), body.notes ?? null, body.availableForSwap ?? false],
   );
   broadcast("shifts");
   res.status(201).json({ shift: rowToShift(r.rows[0]) });
@@ -107,9 +109,10 @@ router.put("/shifts/:id", async (req, res) => {
     res.status(409).json({ error: "Já existe outro serviço neste dia com as mesmas horas de início e fim." }); return;
   }
   const r = await pool.query(
-    `UPDATE shifts SET date=$1,code=$2,vehicle_code=$3,affectation=$4,affectation_label=$5,stops=$6,notes=$7,available_for_swap=$8 WHERE id=$9 RETURNING *`,
-    [body.date, body.code ?? null, body.vehicleCode ?? null, body.affectation, body.affectationLabel ?? null,
-     JSON.stringify(body.stops), body.notes ?? null, body.availableForSwap ?? false, req.params.id],
+    `UPDATE shifts SET date=$1,code=$2,vehicle_code=$3,vehicle_kind=$4,affectation=$5,affectation_label=$6,stops=$7,notes=$8,available_for_swap=$9 WHERE id=$10 RETURNING *`,
+    [body.date, body.code ?? null, body.vehicleCode ?? null, body.vehicleKind ?? null,
+     body.affectation, body.affectationLabel ?? null, JSON.stringify(body.stops),
+     body.notes ?? null, body.availableForSwap ?? false, req.params.id],
   );
   broadcast("shifts");
   res.json({ shift: rowToShift(r.rows[0]) });

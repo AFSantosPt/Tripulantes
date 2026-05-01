@@ -16,6 +16,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  VEHICLE_LABELS,
+  VehicleKind,
+} from "@/contexts/BreakdownsContext";
 import { useShifts } from "@/contexts/ShiftsContext";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -61,6 +66,24 @@ function getApiBase(): string {
   return "";
 }
 
+const CATEGORY_VEHICLE_MAP: Record<string, VehicleKind[]> = {
+  motorista: ["autocarro"],
+  "guarda-freio": ["eletrico"],
+  ascensor: ["ascensor"],
+  outro: ["autocarro", "eletrico", "ascensor"],
+};
+
+const ALL_VEHICLE_KINDS: VehicleKind[] = ["autocarro", "eletrico", "ascensor"];
+
+function vehicleOptionsForCategories(categories: string[]): VehicleKind[] {
+  const kindSet = new Set<VehicleKind>();
+  for (const cat of categories) {
+    for (const kind of (CATEGORY_VEHICLE_MAP[cat] ?? [])) kindSet.add(kind);
+  }
+  if (kindSet.size === 0) return ALL_VEHICLE_KINDS;
+  return ALL_VEHICLE_KINDS.filter((k) => kindSet.has(k));
+}
+
 async function ocrImage(
   base64: string,
   mimeType: string,
@@ -83,6 +106,11 @@ export default function ShiftImportScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { addShift, shifts } = useShifts();
+  const { user } = useAuth();
+  const vehicleOptions = useMemo(
+    () => vehicleOptionsForCategories(user?.categories ?? []),
+    [user?.categories],
+  );
   const params = useLocalSearchParams<{ date?: string }>();
   const fallbackDate =
     typeof params.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(params.date)
@@ -92,6 +120,7 @@ export default function ShiftImportScreen() {
   const [text, setText] = useState<string>("");
   const [analyzed, setAnalyzed] = useState<ImportResult | null>(null);
   const [selectedIds, setSelectedIds] = useState<Record<number, boolean>>({});
+  const [vehicleKinds, setVehicleKinds] = useState<Record<number, VehicleKind>>({});
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
   const [ocrLoading, setOcrLoading] = useState<boolean>(false);
@@ -116,17 +145,21 @@ export default function ShiftImportScreen() {
     const r = parseShiftImport(text, fallbackDate);
     setAnalyzed(r);
     const initialSel: Record<number, boolean> = {};
+    const initialKinds: Record<number, VehicleKind> = {};
     r.shifts.forEach((s, idx) => {
       const key = `${s.date}|${s.startTime}|${s.endTime}`;
       initialSel[idx] = isValidParsedShift(s) && !existingKeySet.has(key);
+      if (vehicleOptions.length === 1) initialKinds[idx] = vehicleOptions[0];
     });
     setSelectedIds(initialSel);
+    setVehicleKinds(initialKinds);
   };
 
   const handleClear = () => {
     setText("");
     setAnalyzed(null);
     setSelectedIds({});
+    setVehicleKinds({});
     setResultMsg(null);
     setOcrError(null);
   };
@@ -197,6 +230,7 @@ export default function ShiftImportScreen() {
           date: s.date,
           code: s.code,
           vehicleCode: s.vehicleCode,
+          vehicleKind: vehicleKinds[i],
           affectation: s.affectation,
           affectationLabel: s.affectationLabel,
           stops: [
@@ -397,6 +431,11 @@ export default function ShiftImportScreen() {
               selected={selectedIds}
               onToggle={toggle}
               existingKeySet={existingKeySet}
+              vehicleKinds={vehicleKinds}
+              vehicleOptions={vehicleOptions}
+              onVehicleKindChange={(idx, kind) =>
+                setVehicleKinds((prev) => ({ ...prev, [idx]: kind }))
+              }
             />
           ) : null}
 
@@ -444,11 +483,17 @@ function AnalyzedSection({
   selected,
   onToggle,
   existingKeySet,
+  vehicleKinds,
+  vehicleOptions,
+  onVehicleKindChange,
 }: {
   result: ImportResult;
   selected: Record<number, boolean>;
   onToggle: (idx: number) => void;
   existingKeySet: Set<string>;
+  vehicleKinds: Record<number, VehicleKind>;
+  vehicleOptions: VehicleKind[];
+  onVehicleKindChange: (idx: number, kind: VehicleKind) => void;
 }) {
   const colors = useColors();
   if (result.shifts.length === 0) {
@@ -513,6 +558,9 @@ function AnalyzedSection({
           isDuplicate={existingKeySet.has(
             `${s.date}|${s.startTime}|${s.endTime}`,
           )}
+          vehicleKind={vehicleKinds[idx]}
+          vehicleOptions={vehicleOptions}
+          onVehicleKindChange={(kind) => onVehicleKindChange(idx, kind)}
         />
       ))}
       {result.warnings.length > 0 ? (
@@ -553,11 +601,17 @@ function ParsedShiftRow({
   checked,
   onToggle,
   isDuplicate,
+  vehicleKind,
+  vehicleOptions,
+  onVehicleKindChange,
 }: {
   shift: ParsedShift;
   checked: boolean;
   onToggle: () => void;
   isDuplicate: boolean;
+  vehicleKind?: VehicleKind;
+  vehicleOptions: VehicleKind[];
+  onVehicleKindChange: (kind: VehicleKind) => void;
 }) {
   const colors = useColors();
   const valid = isValidParsedShift(shift);
@@ -644,6 +698,35 @@ function ParsedShiftRow({
             {shift.endTime}
           </Text>
         </View>
+        {vehicleOptions.length > 1 ? (
+          <View style={styles.vehicleChipRow}>
+            {vehicleOptions.map((k) => {
+              const active = vehicleKind === k;
+              return (
+                <Pressable
+                  key={k}
+                  onPress={() => onVehicleKindChange(k)}
+                  style={[
+                    styles.vehicleChip,
+                    {
+                      backgroundColor: active ? colors.primary : colors.muted,
+                      borderRadius: colors.radius / 1.5,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.vehicleChipText,
+                      { color: active ? colors.primaryForeground : colors.mutedForeground },
+                    ]}
+                  >
+                    {VEHICLE_LABELS[k]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -863,6 +946,20 @@ const styles = StyleSheet.create({
   successText: {
     flex: 1,
     fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  vehicleChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  vehicleChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  vehicleChipText: {
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
 });

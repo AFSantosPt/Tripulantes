@@ -36,6 +36,7 @@ export interface Shift {
   date: string;
   code?: string;
   vehicleCode?: string;
+  vehicleKind?: string;
   affectation: AffectationType;
   affectationLabel?: string;
   stops: ShiftStop[];
@@ -83,6 +84,7 @@ function migrateRaw(raw: any): Shift {
       date: raw.date,
       code: raw.code ?? undefined,
       vehicleCode: raw.vehicleCode ?? undefined,
+      vehicleKind: raw.vehicleKind ?? undefined,
       affectation: raw.affectation ?? "normal",
       affectationLabel: raw.affectationLabel ?? undefined,
       stops: raw.stops.map((s: any) => ({
