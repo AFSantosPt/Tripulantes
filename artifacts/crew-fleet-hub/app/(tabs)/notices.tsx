@@ -362,12 +362,13 @@ export default function NoticesScreen() {
   const topPad = isWeb ? Math.max(insets.top, 67) : insets.top;
 
   const { user } = useAuth();
-  const { notices, fetchNotices, sendNotice, markRead, deleteNotice } = useNotices();
+  const { notices, fetchNotices, sendNotice, markRead, markAllRead, deleteNotice } = useNotices();
   const [composeOpen, setComposeOpen] = useState(false);
 
   useEffect(() => {
-    fetchNotices();
-  }, [fetchNotices]);
+    fetchNotices().then(() => markAllRead());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSend = async (title: string, body: string, targetMemberId: string | null) => {
     await sendNotice(title, body, targetMemberId);

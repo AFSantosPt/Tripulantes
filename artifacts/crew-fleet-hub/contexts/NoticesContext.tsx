@@ -29,6 +29,7 @@ interface NoticesState {
   fetchNotices: () => Promise<void>;
   sendNotice: (title: string, body: string, targetMemberId?: string | null) => Promise<{ ok: boolean; reason?: string }>;
   markRead: (id: string) => Promise<void>;
+  markAllRead: () => Promise<void>;
   deleteNotice: (id: string) => Promise<void>;
 }
 
@@ -93,6 +94,25 @@ export function NoticesProvider({ children }: { children: React.ReactNode }) {
     [user],
   );
 
+  const markAllRead = useCallback(
+    async () => {
+      if (!user) return;
+      let unreadIds: string[] = [];
+      setNotices((prev) => {
+        unreadIds = prev.filter((n) => !n.readByIds.includes(user.id)).map((n) => n.id);
+        return prev.map((n) =>
+          n.readByIds.includes(user.id) ? n : { ...n, readByIds: [...n.readByIds, user.id] },
+        );
+      });
+      await Promise.all(
+        unreadIds.map((id) =>
+          apiFetch(`/api/notices/${id}/read`, { method: "POST", memberId: user.id }).catch(() => {}),
+        ),
+      );
+    },
+    [user],
+  );
+
   const deleteNotice = useCallback(
     async (id: string) => {
       if (!user) return;
@@ -110,8 +130,8 @@ export function NoticesProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ notices, unreadCount, fetchNotices, sendNotice, markRead, deleteNotice }),
-    [notices, unreadCount, fetchNotices, sendNotice, markRead, deleteNotice],
+    () => ({ notices, unreadCount, fetchNotices, sendNotice, markRead, markAllRead, deleteNotice }),
+    [notices, unreadCount, fetchNotices, sendNotice, markRead, markAllRead, deleteNotice],
   );
 
   return <NoticesContext.Provider value={value}>{children}</NoticesContext.Provider>;
