@@ -224,6 +224,53 @@ export default function TeamScreen() {
                 color={colors.mutedForeground}
               />
             </Pressable>
+            <Pressable
+              onPress={() => router.push("/crew-categories")}
+              style={({ pressed }) => [
+                styles.passwordRow,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  borderRadius: colors.radius,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.passwordIcon,
+                  { backgroundColor: colors.muted },
+                ]}
+              >
+                <Feather
+                  name="tag"
+                  size={16}
+                  color={colors.mutedForeground}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[styles.passwordTitle, { color: colors.foreground }]}
+                >
+                  Minhas categorias
+                </Text>
+                <Text
+                  style={[
+                    styles.passwordMeta,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  {user?.categories?.length
+                    ? user.categories.map((c) => CREW_CATEGORY_LABELS[c]).join(" · ")
+                    : "Nenhuma categoria definida"}
+                </Text>
+              </View>
+              <Feather
+                name="chevron-right"
+                size={20}
+                color={colors.mutedForeground}
+              />
+            </Pressable>
             {!isAdmin ? (
               <View
                 style={[

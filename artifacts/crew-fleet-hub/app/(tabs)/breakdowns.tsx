@@ -123,7 +123,7 @@ export default function BreakdownsScreen() {
             <EmptyState
               icon="archive"
               title="Sem histórico ainda"
-              description="As avarias com 3 confirmações de tripulantes diferentes vão aparecer aqui."
+              description="As avarias com 2 confirmações de tripulantes diferentes vão aparecer aqui."
             />
           )
         }

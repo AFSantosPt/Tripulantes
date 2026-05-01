@@ -19,6 +19,25 @@ import { useAuth } from "@/contexts/AuthContext";
 import { VehicleKind, useBreakdowns } from "@/contexts/BreakdownsContext";
 import { useColors } from "@/hooks/useColors";
 
+const CATEGORY_VEHICLE_MAP: Record<string, VehicleKind[]> = {
+  motorista: ["autocarro"],
+  "guarda-freio": ["eletrico"],
+  outro: ["autocarro", "eletrico"],
+};
+
+function vehicleOptionsForCategories(categories: string[]): { value: VehicleKind; label: string }[] {
+  const kindSet = new Set<VehicleKind>();
+  for (const cat of categories) {
+    for (const kind of (CATEGORY_VEHICLE_MAP[cat] ?? [])) kindSet.add(kind);
+  }
+  if (kindSet.size === 0) { kindSet.add("autocarro"); kindSet.add("eletrico"); }
+  const all: { value: VehicleKind; label: string }[] = [
+    { value: "autocarro", label: "Autocarro" },
+    { value: "eletrico", label: "Elétrico" },
+  ];
+  return all.filter((o) => kindSet.has(o.value));
+}
+
 export default function NewBreakdownScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -26,7 +45,8 @@ export default function NewBreakdownScreen() {
   const { reportBreakdown } = useBreakdowns();
   const { user } = useAuth();
 
-  const [kind, setKind] = useState<VehicleKind>("autocarro");
+  const vehicleOptions = vehicleOptionsForCategories(user?.categories ?? []);
+  const [kind, setKind] = useState<VehicleKind>(vehicleOptions[0]?.value ?? "autocarro");
   const [fleetNumber, setFleetNumber] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -122,10 +142,7 @@ export default function NewBreakdownScreen() {
               <SegmentedControl<VehicleKind>
                 value={kind}
                 onChange={setKind}
-                options={[
-                  { value: "autocarro", label: "Autocarro" },
-                  { value: "eletrico", label: "Elétrico" },
-                ]}
+                options={vehicleOptions}
               />
             </View>
 
@@ -166,7 +183,7 @@ export default function NewBreakdownScreen() {
                 style={{ marginTop: 2 }}
               />
               <Text style={[styles.hintText, { color: colors.foreground }]}>
-                A avaria fica ativa até 3 colegas confirmarem a reparação.
+                A avaria fica ativa até 2 colegas confirmarem a reparação.
                 Todos veem quem reportou e quem já validou.
               </Text>
             </View>

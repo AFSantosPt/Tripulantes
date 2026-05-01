@@ -20,28 +20,59 @@ import {
 } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
+const CATEGORY_DESCRIPTIONS: Record<CrewCategory, string> = {
+  motorista: "Conduz autocarros · pode reportar avarias de autocarro",
+  "guarda-freio": "Opera elétricos · pode reportar avarias de elétrico",
+  outro: "Outra função operacional",
+};
+
 export default function CrewCategoriesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { members, updateCategories, user } = useAuth();
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { user, members, updateCategories } = useAuth();
 
-  const member = id ? members.find((m) => m.id === id) : undefined;
+  const targetId = id ?? user?.id ?? "";
+  const targetMember = members.find((m) => m.id === targetId) ?? (targetId === user?.id ? user : undefined);
+  const isSelf = targetId === user?.id;
+  const canEdit = isSelf || user?.isAdmin;
+
   const [selected, setSelected] = useState<CrewCategory[]>(
-    member?.categories ?? [],
+    targetMember?.categories ?? [],
   );
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (member) setSelected(member.categories ?? []);
-  }, [member?.id]);
+    setSelected(targetMember?.categories ?? []);
+  }, [targetMember?.id]);
+
+  const toggle = (cat: CrewCategory) => {
+    setSaved(false);
+    setSelected((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+    );
+  };
+
+  const handleSave = async () => {
+    if (selected.length === 0 || !canEdit) return;
+    setSaving(true);
+    try {
+      await updateCategories(targetId, selected);
+      setSaved(true);
+      setTimeout(() => router.back(), 700);
+    } catch {
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? Math.max(insets.top, 67) : insets.top;
   const bottomPad = isWeb ? Math.max(insets.bottom, 34) : insets.bottom + 24;
 
-  if (!member || !user?.isAdmin) {
+  if (!canEdit) {
     return (
       <View
         style={[
@@ -57,72 +88,36 @@ export default function CrewCategoriesScreen() {
         <Text style={[styles.missing, { color: colors.foreground }]}>
           Acesso não permitido
         </Text>
-        <PrimaryButton
-          label="Voltar"
-          variant="secondary"
-          onPress={() => router.back()}
-        />
+        <PrimaryButton label="Voltar" variant="secondary" onPress={() => router.back()} />
       </View>
     );
   }
 
-  const toggle = (cat: CrewCategory) => {
-    setSelected((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
-    );
-  };
-
-  const handleSave = async () => {
-    if (selected.length === 0) return;
-    setSaving(true);
-    try {
-      await updateCategories(member.id, selected);
-      router.back();
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={{
-          paddingTop: topPad + 12,
-          paddingBottom: bottomPad + 24,
-          paddingHorizontal: 20,
-          gap: 20,
-        }}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingTop: topPad + 16, paddingBottom: bottomPad },
+        ]}
       >
-        <View style={styles.header}>
+        <View style={styles.headerRow}>
           <Pressable
             onPress={() => router.back()}
-            style={({ pressed }) => [
-              styles.iconBtn,
-              {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                borderRadius: colors.radius,
-                opacity: pressed ? 0.85 : 1,
-              },
-            ]}
+            hitSlop={12}
+            style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <Feather name="arrow-left" size={20} color={colors.foreground} />
+            <Feather name="arrow-left" size={22} color={colors.foreground} />
           </Pressable>
-          <View style={{ width: 44 }} />
-        </View>
-
-        <View style={{ gap: 4 }}>
-          <Text style={[styles.title, { color: colors.foreground }]}>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>
             Categorias
           </Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-            {member.name} · Nº {member.crewId}
-          </Text>
+          <View style={{ width: 22 }} />
         </View>
 
         <View
           style={[
-            styles.card,
+            styles.memberCard,
             {
               backgroundColor: colors.card,
               borderColor: colors.border,
@@ -130,63 +125,106 @@ export default function CrewCategoriesScreen() {
             },
           ]}
         >
-          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-            Seleciona uma ou mais categorias
-          </Text>
-          <View style={styles.chipGrid}>
-            {ALL_CREW_CATEGORIES.map((cat) => {
-              const isSelected = selected.includes(cat);
-              return (
-                <Pressable
-                  key={cat}
-                  onPress={() => toggle(cat)}
-                  style={({ pressed }) => [
-                    styles.chip,
+          <View
+            style={[
+              styles.avatar,
+              { backgroundColor: isSelf ? colors.primary : colors.accent },
+            ]}
+          >
+            <Text
+              style={{
+                color: isSelf ? colors.primaryForeground : colors.accentForeground,
+                fontFamily: "Inter_700Bold",
+                fontSize: 16,
+              }}
+            >
+              {(targetMember?.name ?? "?").charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.memberName, { color: colors.foreground }]}>
+              {targetMember?.name ?? "—"}
+              {isSelf ? "  (tu)" : ""}
+            </Text>
+            <Text style={[styles.memberMeta, { color: colors.mutedForeground }]}>
+              Nº {targetMember?.crewId}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={[styles.helper, { color: colors.mutedForeground }]}>
+          As categorias definem que tipo de avarias o tripulante pode reportar.
+          Seleciona pelo menos uma.
+        </Text>
+
+        <View style={styles.options}>
+          {ALL_CREW_CATEGORIES.map((cat) => {
+            const active = selected.includes(cat);
+            return (
+              <Pressable
+                key={cat}
+                onPress={() => toggle(cat)}
+                style={({ pressed }) => [
+                  styles.option,
+                  {
+                    backgroundColor: active ? colors.primary : colors.card,
+                    borderColor: active ? colors.primary : colors.border,
+                    borderRadius: colors.radius,
+                    opacity: pressed ? 0.88 : 1,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.checkbox,
                     {
-                      backgroundColor: isSelected
-                        ? colors.primary
-                        : colors.muted,
-                      borderRadius: colors.radius,
-                      opacity: pressed ? 0.85 : 1,
+                      backgroundColor: active ? colors.primaryForeground : "transparent",
+                      borderColor: active ? colors.primaryForeground : colors.border,
                     },
                   ]}
                 >
-                  <Feather
-                    name={isSelected ? "check-square" : "square"}
-                    size={16}
-                    color={
-                      isSelected ? colors.primaryForeground : colors.mutedForeground
-                    }
-                  />
+                  {active ? (
+                    <Feather name="check" size={12} color={colors.primary} />
+                  ) : null}
+                </View>
+                <View style={{ flex: 1 }}>
                   <Text
                     style={[
-                      styles.chipText,
-                      {
-                        color: isSelected
-                          ? colors.primaryForeground
-                          : colors.foreground,
-                      },
+                      styles.optionLabel,
+                      { color: active ? colors.primaryForeground : colors.foreground },
                     ]}
                   >
                     {CREW_CATEGORY_LABELS[cat]}
                   </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          {selected.length === 0 ? (
-            <Text style={[styles.hint, { color: colors.destructive }]}>
-              Seleciona pelo menos uma categoria
-            </Text>
-          ) : null}
+                  <Text
+                    style={[
+                      styles.optionDesc,
+                      {
+                        color: active ? colors.primaryForeground : colors.mutedForeground,
+                        opacity: active ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    {CATEGORY_DESCRIPTIONS[cat]}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
 
+        {selected.length === 0 ? (
+          <Text style={[styles.warning, { color: colors.destructive }]}>
+            Seleciona pelo menos uma categoria.
+          </Text>
+        ) : null}
+
         <PrimaryButton
-          label="Guardar categorias"
-          icon="save"
+          label={saved ? "Guardado!" : "Guardar categorias"}
+          icon={saved ? "check" : "tag"}
           onPress={handleSave}
           loading={saving}
-          disabled={selected.length === 0}
+          disabled={selected.length === 0 || saved}
         />
       </ScrollView>
     </View>
@@ -195,59 +233,63 @@ export default function CrewCategoriesScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  scroll: { paddingHorizontal: 24, gap: 16 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  backBtn: { padding: 4 },
+  headerTitle: { fontSize: 17, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  memberCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderWidth: 1,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  memberName: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  memberMeta: { fontSize: 13, fontFamily: "Inter_500Medium", marginTop: 2 },
+  helper: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+  options: { gap: 10 },
+  option: {
+    borderWidth: 1,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  optionLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  optionDesc: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  warning: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    textAlign: "center",
+  },
   missing: {
     fontSize: 18,
     fontFamily: "Inter_600SemiBold",
     marginBottom: 16,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  iconBtn: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  title: {
-    fontSize: 24,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    marginTop: 2,
-  },
-  card: {
-    borderWidth: 1,
-    padding: 16,
-    gap: 14,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  chipGrid: {
-    gap: 8,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    padding: 14,
-  },
-  chipText: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-  },
-  hint: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
   },
 });
