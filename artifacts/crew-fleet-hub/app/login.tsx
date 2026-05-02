@@ -72,7 +72,7 @@ export default function LoginScreen() {
             <Feather name="users" size={26} color={colors.primaryForeground} />
           </View>
           <Text style={[styles.brand, { color: colors.foreground }]}>
-            Tripulante
+            Tripulantes
           </Text>
           <Text style={[styles.brandSub, { color: colors.mutedForeground }]}>
             gestão
