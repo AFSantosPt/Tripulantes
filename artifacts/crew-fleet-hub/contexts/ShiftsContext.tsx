@@ -37,6 +37,7 @@ export interface Shift {
   code?: string;
   vehicleCode?: string;
   vehicleKind?: string;
+  fleetNumber?: string;
   affectation: AffectationType;
   affectationLabel?: string;
   stops: ShiftStop[];
@@ -85,6 +86,7 @@ function migrateRaw(raw: any): Shift {
       code: raw.code ?? undefined,
       vehicleCode: raw.vehicleCode ?? undefined,
       vehicleKind: raw.vehicleKind ?? undefined,
+      fleetNumber: raw.fleetNumber ?? undefined,
       affectation: raw.affectation ?? "normal",
       affectationLabel: raw.affectationLabel ?? undefined,
       stops: raw.stops.map((s: any) => ({
@@ -104,6 +106,7 @@ function migrateRaw(raw: any): Shift {
     date: raw?.date ?? new Date().toISOString().slice(0, 10),
     code: raw?.code ?? undefined,
     vehicleCode: raw?.vehicleCode ?? undefined,
+    fleetNumber: raw?.fleetNumber ?? undefined,
     affectation: raw?.affectation ?? "normal",
     affectationLabel: raw?.affectationLabel ?? undefined,
     stops: [

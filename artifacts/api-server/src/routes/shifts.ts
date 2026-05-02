@@ -10,7 +10,7 @@ interface ShiftStop { location: string; time: string; }
 
 interface Shift {
   id: string; crewMemberId: string; date: string; code?: string; vehicleCode?: string;
-  vehicleKind?: string;
+  vehicleKind?: string; fleetNumber?: string;
   affectation: string; affectationLabel?: string; stops: ShiftStop[];
   notes?: string; availableForSwap?: boolean; createdAt: string;
 }
@@ -19,7 +19,7 @@ function rowToShift(row: any): Shift {
   return {
     id: row.id, crewMemberId: row.crew_member_id, date: row.date,
     code: row.code ?? undefined, vehicleCode: row.vehicle_code ?? undefined,
-    vehicleKind: row.vehicle_kind ?? undefined,
+    vehicleKind: row.vehicle_kind ?? undefined, fleetNumber: row.fleet_number ?? undefined,
     affectation: row.affectation, affectationLabel: row.affectation_label ?? undefined,
     stops: row.stops ?? [], notes: row.notes ?? undefined,
     availableForSwap: row.available_for_swap ?? false,
@@ -170,9 +170,10 @@ router.post("/shifts", async (req, res) => {
   }
   const id = newId();
   const r = await pool.query(
-    `INSERT INTO shifts (id,crew_member_id,date,code,vehicle_code,vehicle_kind,affectation,affectation_label,stops,notes,available_for_swap,created_at,updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW()) RETURNING *`,
+    `INSERT INTO shifts (id,crew_member_id,date,code,vehicle_code,vehicle_kind,fleet_number,affectation,affectation_label,stops,notes,available_for_swap,created_at,updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW(),NOW()) RETURNING *`,
     [id, member.id, body.date, body.code ?? null, body.vehicleCode ?? null, body.vehicleKind ?? null,
+     body.fleetNumber ?? null,
      body.affectation, body.affectationLabel ?? null, JSON.stringify(body.stops), body.notes ?? null, body.availableForSwap ?? false],
   );
   broadcast("shifts");
@@ -210,8 +211,9 @@ router.put("/shifts/:id", async (req, res) => {
     if (rest) { res.status(409).json({ error: rest }); return; }
   }
   const r = await pool.query(
-    `UPDATE shifts SET date=$1,code=$2,vehicle_code=$3,vehicle_kind=$4,affectation=$5,affectation_label=$6,stops=$7,notes=$8,available_for_swap=$9,updated_at=NOW() WHERE id=$10 RETURNING *`,
+    `UPDATE shifts SET date=$1,code=$2,vehicle_code=$3,vehicle_kind=$4,fleet_number=$5,affectation=$6,affectation_label=$7,stops=$8,notes=$9,available_for_swap=$10,updated_at=NOW() WHERE id=$11 RETURNING *`,
     [body.date, body.code ?? null, body.vehicleCode ?? null, body.vehicleKind ?? null,
+     body.fleetNumber ?? null,
      body.affectation, body.affectationLabel ?? null, JSON.stringify(body.stops),
      body.notes ?? null, body.availableForSwap ?? false, req.params.id],
   );

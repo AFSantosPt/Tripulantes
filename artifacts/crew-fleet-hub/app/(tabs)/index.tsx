@@ -553,6 +553,7 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
   const { confirm, modal } = useConfirm();
   const codeLabel = shift.code?.trim() || "Sem código";
   const vehicleLabel = shift.vehicleCode?.trim();
+  const fleetLabel = shift.fleetNumber?.trim();
   const kindLabel = shift.vehicleKind
     ? VEHICLE_LABELS[shift.vehicleKind as VehicleKind]
     : null;
@@ -650,6 +651,18 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
           >
             Serviço de Viatura:{" "}
             <Text style={{ color: colors.foreground }}>{vehicleLabel}</Text>
+          </Text>
+        </View>
+      ) : null}
+
+      {!isAbsence && fleetLabel ? (
+        <View style={styles.vehicleRow}>
+          <Feather name="hash" size={13} color={colors.mutedForeground} />
+          <Text
+            style={[styles.vehicleText, { color: colors.mutedForeground }]}
+          >
+            Nº Viatura:{" "}
+            <Text style={{ color: colors.foreground }}>{fleetLabel}</Text>
           </Text>
         </View>
       ) : null}

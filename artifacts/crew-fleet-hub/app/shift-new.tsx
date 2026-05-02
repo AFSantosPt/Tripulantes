@@ -21,7 +21,7 @@ import {
   ShiftWithCalc,
   useShifts,
 } from "@/contexts/ShiftsContext";
-import { VehicleKind } from "@/contexts/BreakdownsContext";
+import { useBreakdowns, VehicleKind } from "@/contexts/BreakdownsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -76,7 +76,8 @@ export default function NewShiftScreen() {
   const { user } = useAuth();
   const { shifts, addShift, updateShift, removeShift, byId } = useShifts();
   const params = useLocalSearchParams<{ date?: string; id?: string }>();
-  const { confirm, modal } = useConfirm();
+  const { confirm, alert, modal } = useConfirm();
+  const { active: activeBreakdowns } = useBreakdowns();
 
   const vehicleOptions = vehicleOptionsForCategories(user?.categories ?? []);
   const defaultVehicleKind: VehicleKind | undefined =
@@ -97,6 +98,7 @@ export default function NewShiftScreen() {
   const [code, setCode] = useState<string>("");
   const [vehicleCode, setVehicleCode] = useState<string>("");
   const [vehicleKind, setVehicleKind] = useState<VehicleKind | undefined>(defaultVehicleKind);
+  const [fleetNumber, setFleetNumber] = useState<string>("");
   const [affectation, setAffectation] = useState<AffectationType>("normal");
   const [start, setStart] = useState<DraftStop>(EMPTY_STOP);
   const [end, setEnd] = useState<DraftStop>(EMPTY_STOP);
@@ -126,6 +128,7 @@ export default function NewShiftScreen() {
     setCode(existing.code ?? "");
     setVehicleCode(existing.vehicleCode ?? "");
     setVehicleKind((existing.vehicleKind as VehicleKind | undefined) ?? defaultVehicleKind);
+    setFleetNumber(existing.fleetNumber ?? "");
     setAffectation(existing.affectation);
     const first = existing.stops[0];
     const last = existing.stops[existing.stops.length - 1];
@@ -168,6 +171,7 @@ export default function NewShiftScreen() {
     setCode("");
     setVehicleCode("");
     setVehicleKind(defaultVehicleKind);
+    setFleetNumber("");
     setAffectation("normal");
     setStart(EMPTY_STOP);
     setEnd(EMPTY_STOP);
@@ -282,11 +286,13 @@ export default function NewShiftScreen() {
             { location: start.location.trim(), time: start.time.trim() },
             { location: end.location.trim(), time: end.time.trim() },
           ];
+      const savedFleetNumber = isAbsenceType ? undefined : fleetNumber.trim() || undefined;
       const payload = {
         date: iso!,
         code: isAbsenceType ? undefined : code.trim() || undefined,
         vehicleCode: isAbsenceType ? undefined : vehicleCode.trim() || undefined,
         vehicleKind: isAbsenceType ? undefined : vehicleKind,
+        fleetNumber: savedFleetNumber,
         affectation,
         stops: cleanedStops,
         notes: isAbsenceType ? undefined : notes.trim() || undefined,
@@ -299,6 +305,17 @@ export default function NewShiftScreen() {
         return;
       }
       resetForm();
+      if (savedFleetNumber) {
+        const matched = activeBreakdowns.find(
+          (b) => b.fleetNumber.trim().toLowerCase() === savedFleetNumber.toLowerCase(),
+        );
+        if (matched) {
+          alert(
+            "⚠️ Avaria ativa nesta viatura",
+            `A viatura ${savedFleetNumber} tem uma avaria ativa registada. Consulte o separador Avarias para mais detalhes.`,
+          );
+        }
+      }
     } finally {
       setSubmitting(false);
     }
@@ -574,6 +591,15 @@ export default function NewShiftScreen() {
                   errors={errors.start}
                 />
 
+                <TextField
+                  label="Nº da Viatura (opcional)"
+                  placeholder="Ex: 1234"
+                  value={fleetNumber}
+                  onChangeText={setFleetNumber}
+                  keyboardType="numeric"
+                  autoCorrect={false}
+                />
+
                 <StopCard
                   label="Fim"
                   value={end}
@@ -844,6 +870,18 @@ function DayShiftCard({
       <Text style={[styles.dayCardValue, { color: colors.foreground }]}>
         {shift.vehicleCode?.trim() ? shift.vehicleCode : "/"}
       </Text>
+      {shift.fleetNumber?.trim() ? (
+        <>
+          <Text
+            style={[styles.dayCardMeta, { color: colors.mutedForeground, marginTop: 6 }]}
+          >
+            Nº da Viatura
+          </Text>
+          <Text style={[styles.dayCardValue, { color: colors.foreground }]}>
+            {shift.fleetNumber}
+          </Text>
+        </>
+      ) : null}
       <Text
         style={[styles.dayCardMeta, { color: colors.mutedForeground, marginTop: 6 }]}
       >
