@@ -21,6 +21,7 @@ import {
   CrewCategory,
   useAuth,
 } from "@/contexts/AuthContext";
+import { apiFetch } from "@/utils/apiClient";
 import { useColors } from "@/hooks/useColors";
 
 export default function RegisterScreen() {
@@ -32,12 +33,38 @@ export default function RegisterScreen() {
   const [middleName, setMiddleName] = useState<string>("");
   const [lastName, setLastName] = useState<string>("");
   const [crewId, setCrewId] = useState<string>("");
+  const [crewIdError, setCrewIdError] = useState<string | null>(null);
+  const [crewIdBlocked, setCrewIdBlocked] = useState<boolean>(false);
+  const [checkingCrewId, setCheckingCrewId] = useState<boolean>(false);
   const [password, setPassword] = useState<string>("");
   const [confirm, setConfirm] = useState<string>("");
   const [categories, setCategories] = useState<CrewCategory[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const { alert: showInfo, modal } = useConfirm();
+
+  const handleCrewIdBlur = async () => {
+    const trimmed = crewId.trim();
+    if (!trimmed) return;
+    setCheckingCrewId(true);
+    setCrewIdError(null);
+    setCrewIdBlocked(false);
+    try {
+      const res = await apiFetch(`/api/auth/check-crew-id?crewId=${encodeURIComponent(trimmed)}`);
+      const data = await res.json();
+      if (!data.available) {
+        if (data.status === "pending") {
+          setCrewIdError("Este Nº Tripulante já tem um pedido de acesso pendente.");
+        } else {
+          setCrewIdError("Este Nº Tripulante já está registado no sistema.");
+        }
+        setCrewIdBlocked(true);
+      }
+    } catch {
+    } finally {
+      setCheckingCrewId(false);
+    }
+  };
 
   const toggleCategory = (cat: CrewCategory) => {
     setCategories((prev) =>
@@ -165,11 +192,16 @@ export default function RegisterScreen() {
               label="Nº Tripulante"
               placeholder="Ex: 180123"
               value={crewId}
-              onChangeText={setCrewId}
+              onChangeText={(v) => {
+                setCrewId(v);
+                if (crewIdBlocked) { setCrewIdBlocked(false); setCrewIdError(null); }
+              }}
+              onBlur={handleCrewIdBlur}
               autoCapitalize="none"
               keyboardType="number-pad"
               returnKeyType="next"
               testID="register-crew-id"
+              error={crewIdError ?? undefined}
             />
 
             <View style={styles.categoryBlock}>
@@ -252,10 +284,15 @@ export default function RegisterScreen() {
               error={error}
             />
             <PrimaryButton
-              label={isFirstSetup ? "Criar conta" : "Enviar pedido"}
+              label={
+                checkingCrewId
+                  ? "A verificar…"
+                  : isFirstSetup ? "Criar conta" : "Enviar pedido"
+              }
               icon={isFirstSetup ? "shield" : "send"}
               onPress={handleSubmit}
               loading={submitting}
+              disabled={crewIdBlocked || checkingCrewId}
               testID="register-submit"
             />
           </View>

@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
+import rateLimit from "express-rate-limit";
 import { hashPassword, verifyPassword } from "../lib/hash";
 import pool from "../lib/db";
 import {
@@ -17,6 +18,18 @@ const ALL_CREW_CATEGORIES: CrewCategory[] = [
   "motorista",
   "outro",
 ];
+
+const MAX_PENDING_REQUESTS = 20;
+
+const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, res: Response, _next: NextFunction) => {
+    res.status(429).json({ error: "Demasiados pedidos. Tenta novamente dentro de 15 minutos." });
+  },
+});
 
 const router = Router();
 
@@ -49,7 +62,15 @@ router.post("/auth/signin", async (req, res) => {
   res.json({ member: sanitize(found) });
 });
 
-router.post("/auth/register", async (req, res) => {
+router.get("/auth/check-crew-id", async (req, res) => {
+  const crewId = (req.query.crewId as string | undefined)?.trim();
+  if (!crewId) { res.json({ available: true }); return; }
+  const found = await findMemberByCrewId(normalizeCrewId(crewId));
+  if (!found) { res.json({ available: true }); return; }
+  res.json({ available: false, status: found.status });
+});
+
+router.post("/auth/register", registerLimiter, async (req, res) => {
   const { name, crewId, password, categories } = req.body ?? {};
   if (!name?.trim()) { res.status(400).json({ error: "Indica o teu nome" }); return; }
   if (!crewId?.trim()) { res.status(400).json({ error: "Indica o teu Nº Tripulante" }); return; }
@@ -64,9 +85,16 @@ router.post("/auth/register", async (req, res) => {
   );
   const existing = await findMemberByCrewId(normalizeCrewId(crewId));
   if (existing) {
-    res.status(409).json({ error: "Já existe um pedido com este Nº Tripulante" }); return;
+    if (existing.status === "pending") {
+      res.status(409).json({ error: "Este Nº Tripulante já tem um pedido de acesso pendente.", kind: "pending" }); return;
+    }
+    res.status(409).json({ error: "Este Nº Tripulante já está registado no sistema.", kind: "active" }); return;
   }
   const members = await readMembers();
+  const pendingCount = members.filter((m) => m.status === "pending").length;
+  if (pendingCount >= MAX_PENDING_REQUESTS) {
+    res.status(503).json({ error: "Existe um elevado número de pedidos pendentes. Tenta mais tarde." }); return;
+  }
   const hasActiveAdmin = members.some((m) => m.status === "active" && m.isAdmin);
   const autoActivated = !hasActiveAdmin;
   const created = await createMember({
