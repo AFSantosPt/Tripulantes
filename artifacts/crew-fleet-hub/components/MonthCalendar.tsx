@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
@@ -111,17 +112,20 @@ export function MonthCalendar({
   todayIso,
 }: MonthCalendarProps) {
   const colors = useColors();
+  const { width: screenWidth } = useWindowDimensions();
+  // Estimate initial grid width (screen minus card padding 12*2 and horizontal padding 20*2)
+  const estimatedWidth = screenWidth - 64;
   const initial = new Date(selectedDate + "T00:00:00");
   const [view, setView] = useState<{ year: number; month: number }>({
     year: initial.getFullYear(),
     month: initial.getMonth(),
   });
-  const [gridWidth, setGridWidth] = useState(0);
-  const cellSize = gridWidth > 0 ? Math.floor(gridWidth / 7) : 0;
+  const [gridWidth, setGridWidth] = useState(estimatedWidth);
+  const cellSize = Math.floor(gridWidth / 7);
 
   const handleGridLayout = (e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width;
-    if (w !== gridWidth) setGridWidth(w);
+    if (Math.abs(w - gridWidth) > 1) setGridWidth(w);
   };
 
   useEffect(() => {
@@ -199,7 +203,7 @@ export function MonthCalendar({
         ))}
       </View>
       <View style={styles.grid} onLayout={handleGridLayout}>
-        {cellSize > 0 && cells.map((c) => {
+        {cells.map((c) => {
           const isSelected = c.iso === selectedDate;
           const isToday = c.iso === todayIso;
           const hasMark = markedSet.has(c.iso);
