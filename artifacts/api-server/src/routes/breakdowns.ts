@@ -70,7 +70,6 @@ router.post("/breakdowns/:id/confirm", async (req, res) => {
   const existing = await pool.query("SELECT * FROM breakdowns WHERE id=$1", [req.params.id]);
   if (!existing.rows[0]) { res.status(404).json({ error: "Avaria não encontrada" }); return; }
   const b = rowToBreakdown(existing.rows[0]);
-  if (b.reportedById === member.id) { res.status(400).json({ error: "Quem reportou não pode validar a sua própria avaria" }); return; }
   if (b.confirmations.some((c) => c.crewMemberId === member.id)) { res.status(400).json({ error: "Já validaste esta avaria" }); return; }
   if (b.confirmations.length >= REQUIRED_CONFIRMATIONS) { res.status(400).json({ error: "Avaria já resolvida" }); return; }
   const newConf: Confirmation = { crewMemberId: member.id, crewMemberName: member.name, crewIdLabel: member.crewId, at: new Date().toISOString() };

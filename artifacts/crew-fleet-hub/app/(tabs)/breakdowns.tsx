@@ -190,8 +190,6 @@ function BreakdownCard({
   const userConfirmed = breakdown.confirmations.some(
     (c) => c.crewMemberId === currentUserId,
   );
-  const isReporter = breakdown.reportedById === currentUserId;
-
   return (
     <Pressable
       onPress={onPress}
@@ -282,7 +280,6 @@ function BreakdownCard({
           required={required}
           resolved={resolved}
           highlight={userConfirmed}
-          isReporter={isReporter}
         />
       </View>
     </Pressable>
@@ -294,13 +291,11 @@ function ConsensusBar({
   required,
   resolved,
   highlight,
-  isReporter,
 }: {
   count: number;
   required: number;
   resolved: boolean;
   highlight: boolean;
-  isReporter: boolean;
 }) {
   const colors = useColors();
   const items = Array.from({ length: required }, (_, i) => i < count);
@@ -338,9 +333,7 @@ function ConsensusBar({
               ? colors.success
               : highlight
                 ? colors.accent
-                : isReporter
-                  ? colors.mutedForeground
-                  : colors.primary,
+                : colors.primary,
           },
         ]}
       >

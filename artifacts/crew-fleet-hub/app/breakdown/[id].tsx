@@ -96,7 +96,7 @@ export default function BreakdownDetailScreen() {
     user != null &&
     breakdown.confirmations.some((c) => c.crewMemberId === user.id);
 
-  const canConfirm = !resolved && !isReporter && !userConfirmed;
+  const canConfirm = !resolved && !userConfirmed;
 
   const handleConfirm = async () => {
     setSubmitting(true);
@@ -607,26 +607,6 @@ export default function BreakdownDetailScreen() {
             onPress={handleConfirm}
             loading={submitting}
           />
-        ) : isReporter && !resolved ? (
-          <View
-            style={[
-              styles.notice,
-              {
-                backgroundColor: colors.muted,
-                borderRadius: colors.radius,
-              },
-            ]}
-          >
-            <Feather
-              name="user-check"
-              size={16}
-              color={colors.mutedForeground}
-            />
-            <Text style={[styles.noticeText, { color: colors.foreground }]}>
-              Reportaste esta avaria. A validação tem de vir de outros
-              tripulantes.
-            </Text>
-          </View>
         ) : userConfirmed && !resolved ? (
           <View
             style={[
