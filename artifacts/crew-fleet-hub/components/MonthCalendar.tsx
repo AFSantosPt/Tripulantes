@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  LayoutChangeEvent,
   Pressable,
   StyleSheet,
   Text,
@@ -115,6 +116,13 @@ export function MonthCalendar({
     year: initial.getFullYear(),
     month: initial.getMonth(),
   });
+  const [gridWidth, setGridWidth] = useState(0);
+  const cellSize = gridWidth > 0 ? Math.floor(gridWidth / 7) : 0;
+
+  const handleGridLayout = (e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (w !== gridWidth) setGridWidth(w);
+  };
 
   useEffect(() => {
     const d = new Date(selectedDate + "T00:00:00");
@@ -190,25 +198,37 @@ export function MonthCalendar({
           </Text>
         ))}
       </View>
-      <View style={styles.grid}>
-        {cells.map((c) => {
+      <View style={styles.grid} onLayout={handleGridLayout}>
+        {cellSize > 0 && cells.map((c) => {
           const isSelected = c.iso === selectedDate;
           const isToday = c.iso === todayIso;
           const hasMark = markedSet.has(c.iso);
           const isFolga = folgaSet.has(c.iso);
           const dim = !c.inMonth;
+          const innerSize = cellSize - 4; // subtract cell padding (2 each side)
           return (
             <Pressable
               key={c.iso + (c.inMonth ? "" : "-out")}
               onPress={() => onSelectDate(c.iso)}
-              style={({ pressed }) => [
-                styles.cell,
-                { opacity: pressed ? 0.7 : 1 },
-              ]}
+              style={({ pressed }) => ({
+                width: cellSize,
+                height: cellSize,
+                padding: 2,
+                opacity: pressed ? 0.7 : 1,
+                alignItems: "center",
+                justifyContent: "center",
+              })}
             >
               <View
                 style={[
-                  styles.cellInner,
+                  {
+                    width: innerSize,
+                    height: innerSize,
+                    borderRadius: innerSize / 2,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    position: "relative",
+                  },
                   !isSelected && isFolga && c.inMonth && {
                     backgroundColor: FOLGA_BG,
                     borderWidth: 1,
@@ -304,18 +324,6 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-  },
-  cell: {
-    width: `${100 / 7}%`,
-    aspectRatio: 1,
-    padding: 2,
-  },
-  cellInner: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 999,
-    position: "relative",
   },
   cellText: {
     fontSize: 14,
