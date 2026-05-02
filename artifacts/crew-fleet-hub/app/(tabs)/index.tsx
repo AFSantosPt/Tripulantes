@@ -72,13 +72,25 @@ export default function ShiftsScreen() {
 
   const handleRangeStartChange = (text: string) => {
     setRangeStartText(text);
-    const iso = displayDateToIso(text);
-    if (iso) setRangeStart(iso);
+  };
+  const handleRangeStartBlur = () => {
+    const iso = displayDateToIso(rangeStartText);
+    if (iso) {
+      setRangeStart(iso);
+    } else {
+      setRangeStartText(isoToDisplayDate(rangeStart));
+    }
   };
   const handleRangeEndChange = (text: string) => {
     setRangeEndText(text);
-    const iso = displayDateToIso(text);
-    if (iso) setRangeEnd(iso);
+  };
+  const handleRangeEndBlur = () => {
+    const iso = displayDateToIso(rangeEndText);
+    if (iso) {
+      setRangeEnd(iso);
+    } else {
+      setRangeEndText(isoToDisplayDate(rangeEnd));
+    }
   };
 
   const rangeShifts = useMemo(
@@ -259,6 +271,8 @@ export default function ShiftsScreen() {
                 ]}
                 value={rangeStartText}
                 onChangeText={handleRangeStartChange}
+                onBlur={handleRangeStartBlur}
+                onEndEditing={handleRangeStartBlur}
                 placeholder="DD-MM-AAAA"
                 placeholderTextColor="rgba(255,255,255,0.4)"
                 keyboardType="numeric"
@@ -281,6 +295,8 @@ export default function ShiftsScreen() {
                 ]}
                 value={rangeEndText}
                 onChangeText={handleRangeEndChange}
+                onBlur={handleRangeEndBlur}
+                onEndEditing={handleRangeEndBlur}
                 placeholder="DD-MM-AAAA"
                 placeholderTextColor="rgba(255,255,255,0.4)"
                 keyboardType="numeric"
