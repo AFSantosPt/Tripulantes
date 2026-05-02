@@ -32,6 +32,7 @@ import {
   isoMonthKey,
   isoToDisplayDate,
   monthLabel,
+  parseDateClamped,
   parseHHMM,
   todayIso,
 } from "@/utils/time";
@@ -74,10 +75,16 @@ export default function ShiftsScreen() {
   const handleRangeEndChange = (text: string) => setRangeEndText(text);
 
   const applyRange = () => {
-    const isoStart = displayDateToIso(rangeStartText);
-    const isoEnd = displayDateToIso(rangeEndText);
-    if (isoStart) setRangeStart(isoStart);
-    if (isoEnd) setRangeEnd(isoEnd);
+    const start = parseDateClamped(rangeStartText);
+    const end = parseDateClamped(rangeEndText);
+    if (start) {
+      setRangeStart(start.iso);
+      setRangeStartText(start.display);
+    }
+    if (end) {
+      setRangeEnd(end.iso);
+      setRangeEndText(end.display);
+    }
   };
 
   const rangeShifts = useMemo(

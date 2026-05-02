@@ -68,6 +68,25 @@ export function displayDateToIso(input: string): string | null {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+export function parseDateClamped(input: string): { iso: string; display: string } | null {
+  const t = input.trim();
+  const m = t.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  let day = Number(dd);
+  const month = Number(mm);
+  const year = Number(yyyy);
+  if (month < 1 || month > 12) return null;
+  if (day < 1) return null;
+  const lastDay = new Date(year, month, 0).getDate();
+  day = Math.min(day, lastDay);
+  const paddedDay = String(day).padStart(2, "0");
+  return {
+    iso: `${yyyy}-${mm}-${paddedDay}`,
+    display: `${paddedDay}-${mm}-${yyyy}`,
+  };
+}
+
 export function parseTimeToMinutes(input: string): number | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
