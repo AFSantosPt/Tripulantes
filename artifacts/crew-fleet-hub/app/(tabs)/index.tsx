@@ -17,7 +17,7 @@ import { useConfirm } from "@/components/ConfirmModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotices } from "@/contexts/NoticesContext";
 import { useShifts, ShiftWithCalc } from "@/contexts/ShiftsContext";
-import { VEHICLE_LABELS, VehicleKind } from "@/contexts/BreakdownsContext";
+import { useBreakdowns, VEHICLE_LABELS, VehicleKind } from "@/contexts/BreakdownsContext";
 import { FOLGA_GROUPS, FolgaGroup, getFolgaDaysForYear } from "@/utils/folgaSchedule";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -550,7 +550,8 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
   const colors = useColors();
   const router = useRouter();
   const { removeShift, updateShift } = useShifts();
-  const { confirm, modal } = useConfirm();
+  const { confirm, alert, modal } = useConfirm();
+  const { active: activeBreakdowns } = useBreakdowns();
   const [editingFleet, setEditingFleet] = useState(false);
   const [draftFleet, setDraftFleet] = useState(shift.fleetNumber?.trim() ?? "");
   const [savingFleet, setSavingFleet] = useState(false);
@@ -575,13 +576,14 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
 
   const handleSaveFleet = async () => {
     setSavingFleet(true);
+    const saved = draftFleet.trim() || undefined;
     try {
       await updateShift(shift.id, {
         date: shift.date,
         code: shift.code,
         vehicleCode: shift.vehicleCode,
         vehicleKind: shift.vehicleKind,
-        fleetNumber: draftFleet.trim() || undefined,
+        fleetNumber: saved,
         affectation: shift.affectation,
         affectationLabel: shift.affectationLabel,
         stops: shift.stops,
@@ -589,6 +591,17 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
         availableForSwap: shift.availableForSwap,
       });
       setEditingFleet(false);
+      if (saved) {
+        const matched = activeBreakdowns.find(
+          (b) => b.fleetNumber.trim().toLowerCase() === saved.toLowerCase(),
+        );
+        if (matched) {
+          alert(
+            "⚠️ Avaria ativa nesta viatura",
+            `A viatura ${saved} tem uma avaria ativa registada. Consulte o separador Avarias para mais detalhes.`,
+          );
+        }
+      }
     } finally {
       setSavingFleet(false);
     }
