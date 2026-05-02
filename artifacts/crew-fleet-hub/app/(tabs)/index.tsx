@@ -72,25 +72,21 @@ export default function ShiftsScreen() {
 
   const handleRangeStartChange = (text: string) => {
     setRangeStartText(text);
+    const iso = displayDateToIso(text);
+    if (iso) setRangeStart(iso);
   };
   const handleRangeStartBlur = () => {
     const iso = displayDateToIso(rangeStartText);
-    if (iso) {
-      setRangeStart(iso);
-    } else {
-      setRangeStartText(isoToDisplayDate(rangeStart));
-    }
+    if (iso) setRangeStart(iso);
   };
   const handleRangeEndChange = (text: string) => {
     setRangeEndText(text);
+    const iso = displayDateToIso(text);
+    if (iso) setRangeEnd(iso);
   };
   const handleRangeEndBlur = () => {
     const iso = displayDateToIso(rangeEndText);
-    if (iso) {
-      setRangeEnd(iso);
-    } else {
-      setRangeEndText(isoToDisplayDate(rangeEnd));
-    }
+    if (iso) setRangeEnd(iso);
   };
 
   const rangeShifts = useMemo(
