@@ -17,6 +17,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BreakdownsProvider } from "@/contexts/BreakdownsContext";
 import { NoticesProvider } from "@/contexts/NoticesContext";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ShiftsProvider } from "@/contexts/ShiftsContext";
 import { SwapsProvider } from "@/contexts/SwapsContext";
 
@@ -71,6 +72,13 @@ function RootLayoutNav() {
           animation: "slide_from_bottom",
         }}
       />
+      <Stack.Screen
+        name="app-settings"
+        options={{
+          presentation: "modal",
+          animation: "slide_from_bottom",
+        }}
+      />
     </Stack>
   );
 }
@@ -98,15 +106,17 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <AuthProvider>
-                <ShiftsProvider>
-                  <BreakdownsProvider>
-                    <SwapsProvider>
-                      <NoticesProvider>
-                        <RootLayoutNav />
-                      </NoticesProvider>
-                    </SwapsProvider>
-                  </BreakdownsProvider>
-                </ShiftsProvider>
+                <SettingsProvider>
+                  <ShiftsProvider>
+                    <BreakdownsProvider>
+                      <SwapsProvider>
+                        <NoticesProvider>
+                          <RootLayoutNav />
+                        </NoticesProvider>
+                      </SwapsProvider>
+                    </BreakdownsProvider>
+                  </ShiftsProvider>
+                </SettingsProvider>
               </AuthProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

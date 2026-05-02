@@ -122,3 +122,26 @@ export function sanitize(m: CrewMember): Omit<CrewMember, "passwordHash"> {
   const { passwordHash: _ph, ...rest } = m;
   return rest;
 }
+
+export interface AppSettings {
+  nightStart: string;
+  nightEnd: string;
+}
+
+export async function getSettings(): Promise<AppSettings> {
+  const res = await pool.query("SELECT night_start, night_end FROM app_settings WHERE id=1");
+  if (!res.rows[0]) return { nightStart: "22:00", nightEnd: "06:00" };
+  return { nightStart: res.rows[0].night_start, nightEnd: res.rows[0].night_end };
+}
+
+export async function updateSettings(fields: Partial<AppSettings>): Promise<AppSettings> {
+  const sets: string[] = [];
+  const vals: any[] = [];
+  let idx = 1;
+  if (fields.nightStart !== undefined) { sets.push(`night_start=$${idx++}`); vals.push(fields.nightStart); }
+  if (fields.nightEnd !== undefined)   { sets.push(`night_end=$${idx++}`);   vals.push(fields.nightEnd); }
+  if (!sets.length) return getSettings();
+  vals.push(1);
+  await pool.query(`UPDATE app_settings SET ${sets.join(",")} WHERE id=$${idx}`, vals);
+  return getSettings();
+}

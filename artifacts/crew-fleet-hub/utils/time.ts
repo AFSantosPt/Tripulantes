@@ -97,6 +97,23 @@ export function formatHoursDecimal(totalMinutes: number): string {
 
 export const NORMAL_HOURS_BASE_MINUTES = 8 * 60;
 
+export function parseHHMM(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+export function calcNightMinutes(
+  startMin: number,
+  endMin: number,
+  nightStartMin: number,
+  nightEndMin: number,
+): number {
+  if (startMin >= endMin) return 0;
+  const overlap = (wStart: number, wEnd: number) =>
+    Math.max(0, Math.min(endMin, wEnd) - Math.max(startMin, wStart));
+  return overlap(nightStartMin, 1440) + overlap(0, nightEndMin);
+}
+
 export interface ShiftCalc {
   totalMinutes: number;
   normalMinutes: number;

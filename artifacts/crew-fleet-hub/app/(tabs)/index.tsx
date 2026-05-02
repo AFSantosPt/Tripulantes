@@ -16,12 +16,14 @@ import { MonthCalendar } from "@/components/MonthCalendar";
 import { useConfirm } from "@/components/ConfirmModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotices } from "@/contexts/NoticesContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { useShifts, ShiftWithCalc } from "@/contexts/ShiftsContext";
 import { useBreakdowns, VEHICLE_LABELS, VehicleKind } from "@/contexts/BreakdownsContext";
 import { FOLGA_GROUPS, FolgaGroup, getFolgaDaysForYear } from "@/utils/folgaSchedule";
 import { useColors } from "@/hooks/useColors";
 import {
   affectationDisplay,
+  calcNightMinutes,
   dateYear,
   displayDateToIso,
   formatDayHeadline,
@@ -30,6 +32,7 @@ import {
   isoMonthKey,
   isoToDisplayDate,
   monthLabel,
+  parseHHMM,
   todayIso,
 } from "@/utils/time";
 
@@ -40,6 +43,8 @@ export default function ShiftsScreen() {
   const { user, signOut } = useAuth();
   const { unreadCount: noticesUnread } = useNotices();
   const { shifts, setMultipleSwapAvailable } = useShifts();
+
+  const { settings } = useSettings();
 
   const today = todayIso();
   const [selectedDate, setSelectedDate] = useState<string>(today);
@@ -83,6 +88,9 @@ export default function ShiftsScreen() {
       ),
     [shifts, rangeStart, rangeEnd],
   );
+  const nightStartMin = parseHHMM(settings.nightStart);
+  const nightEndMin = parseHHMM(settings.nightEnd);
+
   const monthTotals = useMemo(() => {
     return rangeShifts.reduce(
       (acc, s) => {
@@ -90,11 +98,12 @@ export default function ShiftsScreen() {
         acc.normal += s.normalMinutes;
         acc.extra += s.extraMinutes;
         acc.holidayDays += s.holidayMinutes > 0 ? 1 : 0;
+        acc.night += calcNightMinutes(s.startMinutes, s.endMinutes, nightStartMin, nightEndMin);
         return acc;
       },
-      { total: 0, normal: 0, extra: 0, holidayDays: 0 },
+      { total: 0, normal: 0, extra: 0, holidayDays: 0, night: 0 },
     );
-  }, [rangeShifts]);
+  }, [rangeShifts, nightStartMin, nightEndMin]);
 
   const markedDates = useMemo(
     () => Array.from(new Set(shifts.map((s) => s.date))),
@@ -149,6 +158,22 @@ export default function ShiftsScreen() {
             </Text>
           </View>
           <View style={{ flexDirection: "row", gap: 8 }}>
+            {user?.isAdmin && (
+              <Pressable
+                onPress={() => router.push("/app-settings")}
+                style={({ pressed }) => [
+                  styles.iconBtn,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                    borderRadius: colors.radius,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+              >
+                <Feather name="settings" size={18} color={colors.mutedForeground} />
+              </Pressable>
+            )}
             <Pressable
               onPress={() => router.push("/(tabs)/notices")}
               style={({ pressed }) => [
@@ -349,6 +374,33 @@ export default function ShiftsScreen() {
                 ]}
               >
                 {monthTotals.holidayDays}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.summaryDivider,
+                {
+                  backgroundColor: colors.primaryForeground,
+                  opacity: 0.15,
+                },
+              ]}
+            />
+            <View style={styles.summaryStat}>
+              <Text
+                style={[
+                  styles.summaryStatLabel,
+                  { color: "#7BA7CC", opacity: 0.95 },
+                ]}
+              >
+                Noturnas
+              </Text>
+              <Text
+                style={[
+                  styles.summaryStatValue,
+                  { color: "#7BA7CC" },
+                ]}
+              >
+                {formatMinutesToTime(monthTotals.night)}
               </Text>
             </View>
           </View>
