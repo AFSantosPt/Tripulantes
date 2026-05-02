@@ -70,23 +70,14 @@ export default function ShiftsScreen() {
     isoToDisplayDate(defaultRangeEnd),
   );
 
-  const handleRangeStartChange = (text: string) => {
-    setRangeStartText(text);
-    const iso = displayDateToIso(text);
-    if (iso) setRangeStart(iso);
-  };
-  const handleRangeStartBlur = () => {
-    const iso = displayDateToIso(rangeStartText);
-    if (iso) setRangeStart(iso);
-  };
-  const handleRangeEndChange = (text: string) => {
-    setRangeEndText(text);
-    const iso = displayDateToIso(text);
-    if (iso) setRangeEnd(iso);
-  };
-  const handleRangeEndBlur = () => {
-    const iso = displayDateToIso(rangeEndText);
-    if (iso) setRangeEnd(iso);
+  const handleRangeStartChange = (text: string) => setRangeStartText(text);
+  const handleRangeEndChange = (text: string) => setRangeEndText(text);
+
+  const applyRange = () => {
+    const isoStart = displayDateToIso(rangeStartText);
+    const isoEnd = displayDateToIso(rangeEndText);
+    if (isoStart) setRangeStart(isoStart);
+    if (isoEnd) setRangeEnd(isoEnd);
   };
 
   const rangeShifts = useMemo(
@@ -267,8 +258,7 @@ export default function ShiftsScreen() {
                 ]}
                 value={rangeStartText}
                 onChangeText={handleRangeStartChange}
-                onBlur={handleRangeStartBlur}
-                onEndEditing={handleRangeStartBlur}
+                onSubmitEditing={applyRange}
                 placeholder="DD-MM-AAAA"
                 placeholderTextColor="rgba(255,255,255,0.4)"
                 keyboardType="numeric"
@@ -291,8 +281,7 @@ export default function ShiftsScreen() {
                 ]}
                 value={rangeEndText}
                 onChangeText={handleRangeEndChange}
-                onBlur={handleRangeEndBlur}
-                onEndEditing={handleRangeEndBlur}
+                onSubmitEditing={applyRange}
                 placeholder="DD-MM-AAAA"
                 placeholderTextColor="rgba(255,255,255,0.4)"
                 keyboardType="numeric"
@@ -300,6 +289,15 @@ export default function ShiftsScreen() {
                 returnKeyType="done"
               />
             </View>
+            <Pressable
+              onPress={applyRange}
+              style={({ pressed }) => [
+                styles.applyBtn,
+                { opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Text style={styles.applyBtnLabel}>=</Text>
+            </Pressable>
           </View>
           <Text
             style={[styles.summaryHours, { color: colors.primaryForeground }]}
@@ -956,6 +954,22 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 10,
     marginBottom: 4,
+  },
+  applyBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  applyBtnLabel: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: "rgba(255,255,255,0.85)",
+    lineHeight: 22,
   },
   rangeField: {
     flex: 1,
