@@ -549,8 +549,11 @@ function affectationBadgeColors(
 function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) {
   const colors = useColors();
   const router = useRouter();
-  const { removeShift } = useShifts();
+  const { removeShift, updateShift } = useShifts();
   const { confirm, modal } = useConfirm();
+  const [editingFleet, setEditingFleet] = useState(false);
+  const [draftFleet, setDraftFleet] = useState(shift.fleetNumber?.trim() ?? "");
+  const [savingFleet, setSavingFleet] = useState(false);
   const codeLabel = shift.code?.trim() || "Sem código";
   const vehicleLabel = shift.vehicleCode?.trim();
   const fleetLabel = shift.fleetNumber?.trim();
@@ -562,6 +565,34 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
   const isPast = shift.date < today;
   const isAbsence = shift.affectation === "folga" || shift.affectation === "ferias";
   const badge = affectationBadgeColors(shift.affectation, colors);
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const canEditFleet =
+    !isAbsence &&
+    (shift.date < today ||
+      (shift.date === today && shift.startMinutes <= currentMinutes));
+
+  const handleSaveFleet = async () => {
+    setSavingFleet(true);
+    try {
+      await updateShift(shift.id, {
+        date: shift.date,
+        code: shift.code,
+        vehicleCode: shift.vehicleCode,
+        vehicleKind: shift.vehicleKind,
+        fleetNumber: draftFleet.trim() || undefined,
+        affectation: shift.affectation,
+        affectationLabel: shift.affectationLabel,
+        stops: shift.stops,
+        notes: shift.notes,
+        availableForSwap: shift.availableForSwap,
+      });
+      setEditingFleet(false);
+    } finally {
+      setSavingFleet(false);
+    }
+  };
 
   const handleDelete = () => {
     confirm({
@@ -655,15 +686,64 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
         </View>
       ) : null}
 
-      {!isAbsence && fleetLabel ? (
-        <View style={styles.vehicleRow}>
+      {!isAbsence && (fleetLabel || canEditFleet) ? (
+        <View style={[styles.vehicleRow, { alignItems: "center" }]}>
           <Feather name="hash" size={13} color={colors.mutedForeground} />
-          <Text
-            style={[styles.vehicleText, { color: colors.mutedForeground }]}
-          >
-            Nº Viatura:{" "}
-            <Text style={{ color: colors.foreground }}>{fleetLabel}</Text>
-          </Text>
+          {editingFleet ? (
+            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <TextInput
+                value={draftFleet}
+                onChangeText={setDraftFleet}
+                placeholder="Ex: 1234"
+                keyboardType="numeric"
+                autoFocus
+                style={[
+                  styles.fleetInput,
+                  {
+                    borderColor: colors.primary,
+                    color: colors.foreground,
+                    backgroundColor: colors.background,
+                    borderRadius: colors.radius / 2,
+                  },
+                ]}
+                placeholderTextColor={colors.mutedForeground}
+              />
+              <Pressable
+                onPress={handleSaveFleet}
+                disabled={savingFleet}
+                style={({ pressed }) => [
+                  styles.fleetBtn,
+                  { backgroundColor: colors.primary, opacity: pressed || savingFleet ? 0.7 : 1, borderRadius: colors.radius / 2 },
+                ]}
+              >
+                <Feather name="check" size={13} color="#fff" />
+              </Pressable>
+              <Pressable
+                onPress={() => { setDraftFleet(fleetLabel ?? ""); setEditingFleet(false); }}
+                style={({ pressed }) => [
+                  styles.fleetBtn,
+                  { backgroundColor: colors.muted, opacity: pressed ? 0.7 : 1, borderRadius: colors.radius / 2 },
+                ]}
+              >
+                <Feather name="x" size={13} color={colors.mutedForeground} />
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              onPress={canEditFleet ? () => { setDraftFleet(fleetLabel ?? ""); setEditingFleet(true); } : undefined}
+              style={({ pressed }) => ({ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", opacity: pressed ? 0.7 : 1 })}
+            >
+              <Text style={[styles.vehicleText, { color: colors.mutedForeground }]}>
+                Nº Viatura:{" "}
+                <Text style={{ color: fleetLabel ? colors.foreground : colors.mutedForeground }}>
+                  {fleetLabel || (canEditFleet ? "Toque para adicionar" : "—")}
+                </Text>
+              </Text>
+              {canEditFleet ? (
+                <Feather name="edit-2" size={12} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
+              ) : null}
+            </Pressable>
+          )}
         </View>
       ) : null}
 
@@ -946,6 +1026,21 @@ const styles = StyleSheet.create({
   vehicleText: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
+  },
+  fleetInput: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    height: 30,
+  },
+  fleetBtn: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
   stopsBox: {
     borderTopWidth: 1,
