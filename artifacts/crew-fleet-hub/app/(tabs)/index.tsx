@@ -22,6 +22,7 @@ import { useBreakdowns, VEHICLE_LABELS, VehicleKind } from "@/contexts/Breakdown
 import { FOLGA_GROUPS, FolgaGroup, getFolgaDaysForYear } from "@/utils/folgaSchedule";
 import { useColors } from "@/hooks/useColors";
 import {
+  ABSENCE_TYPES,
   affectationDisplay,
   calcNightMinutes,
   dateYear,
@@ -134,10 +135,23 @@ export default function ShiftsScreen() {
   );
 
   const isSwapDay = dayShifts.length > 0 && dayShifts.every((s) => s.availableForSwap);
+  const dayHasOnlyAbsences = dayShifts.length > 0 && dayShifts.every((s) => ABSENCE_TYPES.has(s.affectation));
 
   const handleToggleDaySwap = () => {
     const ids = dayShifts.map((s) => s.id);
     setMultipleSwapAvailable(ids, !isSwapDay);
+  };
+
+  const handleMonthChange = (year: number, month: number) => {
+    const mm = String(month + 1).padStart(2, "0");
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const dd = String(lastDay).padStart(2, "0");
+    const newStart = `${year}-${mm}-01`;
+    const newEnd = `${year}-${mm}-${dd}`;
+    setRangeStart(newStart);
+    setRangeEnd(newEnd);
+    setRangeStartText(isoToDisplayDate(newStart));
+    setRangeEndText(isoToDisplayDate(newEnd));
   };
 
   const isWeb = Platform.OS === "web";
@@ -450,6 +464,7 @@ export default function ShiftsScreen() {
         <MonthCalendar
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
+          onMonthChange={handleMonthChange}
           markedDates={markedDates}
           folgaDates={folgaDates}
           todayIso={today}
@@ -536,7 +551,7 @@ export default function ShiftsScreen() {
             {dayShifts.map((s) => (
               <ServiceCard key={s.id} shift={s} today={today} />
             ))}
-            {selectedDate >= today ? (
+            {selectedDate >= today && !dayHasOnlyAbsences ? (
               <Pressable
                 onPress={handleToggleDaySwap}
                 style={({ pressed }) => [

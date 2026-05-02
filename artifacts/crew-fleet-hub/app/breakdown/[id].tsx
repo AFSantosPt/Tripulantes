@@ -201,7 +201,7 @@ export default function BreakdownDetailScreen() {
                 <Feather name="edit-2" size={18} color={colors.foreground} />
               </Pressable>
             ) : null}
-            {isReporter ? (
+            {(isReporter || user?.isAdmin) ? (
               <Pressable
                 onPress={handleDelete}
                 style={({ pressed }) => [

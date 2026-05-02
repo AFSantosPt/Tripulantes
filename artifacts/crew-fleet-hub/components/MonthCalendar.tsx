@@ -14,6 +14,7 @@ import { useColors } from "@/hooks/useColors";
 interface MonthCalendarProps {
   selectedDate: string;
   onSelectDate: (iso: string) => void;
+  onMonthChange?: (year: number, month: number) => void;
   markedDates?: string[];
   folgaDates?: string[];
   todayIso: string;
@@ -107,6 +108,7 @@ const FOLGA_DOT = "#F59E0B";
 export function MonthCalendar({
   selectedDate,
   onSelectDate,
+  onMonthChange,
   markedDates = [],
   folgaDates = [],
   todayIso,
@@ -144,15 +146,17 @@ export function MonthCalendar({
   const goPrev = () => {
     setView((v) => {
       const m = v.month - 1;
-      if (m < 0) return { year: v.year - 1, month: 11 };
-      return { year: v.year, month: m };
+      const next = m < 0 ? { year: v.year - 1, month: 11 } : { year: v.year, month: m };
+      onMonthChange?.(next.year, next.month);
+      return next;
     });
   };
   const goNext = () => {
     setView((v) => {
       const m = v.month + 1;
-      if (m > 11) return { year: v.year + 1, month: 0 };
-      return { year: v.year, month: m };
+      const next = m > 11 ? { year: v.year + 1, month: 0 } : { year: v.year, month: m };
+      onMonthChange?.(next.year, next.month);
+      return next;
     });
   };
 
