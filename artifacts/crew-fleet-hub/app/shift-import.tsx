@@ -230,7 +230,7 @@ export default function ShiftImportScreen() {
           date: s.date,
           code: s.code,
           vehicleCode: s.vehicleCode,
-          vehicleKind: vehicleKinds[i],
+          vehicleKinds: vehicleKinds[i] ? [vehicleKinds[i]] : [],
           affectation: s.affectation,
           affectationLabel: s.affectationLabel,
           stops: [

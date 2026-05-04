@@ -36,7 +36,7 @@ export interface Shift {
   date: string;
   code?: string;
   vehicleCode?: string;
-  vehicleKind?: string;
+  vehicleKinds?: string[];
   fleetNumber?: string;
   affectation: AffectationType;
   affectationLabel?: string;
@@ -77,6 +77,20 @@ interface ShiftsState {
 
 const ShiftsContext = createContext<ShiftsState | null>(null);
 
+function parseVehicleKinds(raw: any): string[] | undefined {
+  if (raw == null) return undefined;
+  if (Array.isArray(raw)) return raw.length > 0 ? raw : undefined;
+  const s = String(raw).trim();
+  if (!s) return undefined;
+  try {
+    const parsed = JSON.parse(s);
+    if (Array.isArray(parsed)) return parsed.length > 0 ? parsed : undefined;
+    return [String(parsed)];
+  } catch {
+    return [s];
+  }
+}
+
 function migrateRaw(raw: any): Shift {
   if (raw && Array.isArray(raw.stops) && raw.stops.length >= 2) {
     return {
@@ -85,7 +99,7 @@ function migrateRaw(raw: any): Shift {
       date: raw.date,
       code: raw.code ?? undefined,
       vehicleCode: raw.vehicleCode ?? undefined,
-      vehicleKind: raw.vehicleKind ?? undefined,
+      vehicleKinds: parseVehicleKinds(raw.vehicleKinds ?? raw.vehicleKind),
       fleetNumber: raw.fleetNumber ?? undefined,
       affectation: raw.affectation ?? "normal",
       affectationLabel: raw.affectationLabel ?? undefined,
@@ -106,6 +120,7 @@ function migrateRaw(raw: any): Shift {
     date: raw?.date ?? new Date().toISOString().slice(0, 10),
     code: raw?.code ?? undefined,
     vehicleCode: raw?.vehicleCode ?? undefined,
+    vehicleKinds: parseVehicleKinds(raw?.vehicleKinds ?? raw?.vehicleKind),
     fleetNumber: raw?.fleetNumber ?? undefined,
     affectation: raw?.affectation ?? "normal",
     affectationLabel: raw?.affectationLabel ?? undefined,
@@ -124,7 +139,7 @@ function decorate(shift: Shift): ShiftWithCalc {
   const last = shift.stops[shift.stops.length - 1];
   const startMin = parseTimeToMinutes(first?.time ?? "00:00") ?? 0;
   const endMin = parseTimeToMinutes(last?.time ?? "00:00") ?? startMin;
-  const safeEnd = endMin >= startMin ? endMin : startMin;
+  const safeEnd = endMin >= startMin ? endMin : endMin + 1440;
   return {
     ...shift,
     startMinutes: startMin,

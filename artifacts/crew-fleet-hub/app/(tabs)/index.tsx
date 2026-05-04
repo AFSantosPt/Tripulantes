@@ -98,17 +98,21 @@ export default function ShiftsScreen() {
   const nightStartMin = parseHHMM(settings.nightStart);
   const nightEndMin = parseHHMM(settings.nightEnd);
 
+  const DRIVING_VEHICLE_KINDS = new Set(["eletrico", "autocarro", "ascensor"]);
+
   const monthTotals = useMemo(() => {
     return rangeShifts.reduce(
       (acc, s) => {
         acc.total += s.totalMinutes;
-        acc.normal += s.normalMinutes;
         acc.extra += s.extraMinutes;
         acc.holidayDays += s.holidayMinutes > 0 ? 1 : 0;
         acc.night += calcNightMinutes(s.startMinutes, s.endMinutes, nightStartMin, nightEndMin);
+        if ((s.vehicleKinds ?? []).some((k) => DRIVING_VEHICLE_KINDS.has(k))) {
+          acc.driving += s.totalMinutes;
+        }
         return acc;
       },
-      { total: 0, normal: 0, extra: 0, holidayDays: 0, night: 0 },
+      { total: 0, driving: 0, extra: 0, holidayDays: 0, night: 0 },
     );
   }, [rangeShifts, nightStartMin, nightEndMin]);
 
@@ -342,7 +346,7 @@ export default function ShiftsScreen() {
                   { color: colors.primaryForeground, opacity: 0.6 },
                 ]}
               >
-                Normais
+                Condução
               </Text>
               <Text
                 style={[
@@ -350,7 +354,7 @@ export default function ShiftsScreen() {
                   { color: colors.primaryForeground },
                 ]}
               >
-                {formatMinutesToTime(monthTotals.normal)}
+                {formatMinutesToTime(monthTotals.driving)}
               </Text>
             </View>
             <View
@@ -642,9 +646,15 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
   const codeLabel = shift.code?.trim() || "Sem código";
   const vehicleLabel = shift.vehicleCode?.trim();
   const fleetLabel = shift.fleetNumber?.trim();
-  const kindLabel = shift.vehicleKind
-    ? VEHICLE_LABELS[shift.vehicleKind as VehicleKind]
-    : null;
+  const SHIFT_VEHICLE_LABELS: Record<string, string> = {
+    eletrico: "Eléctrico",
+    autocarro: "Autocarro",
+    ascensor: "Ascensor",
+    outro: "Outro",
+  };
+  const kindLabels = (shift.vehicleKinds ?? []).map(
+    (k) => SHIFT_VEHICLE_LABELS[k] ?? k,
+  );
   const affLabel =
     affectationDisplay(shift.affectation, shift.affectationLabel);
   const isPast = shift.date < today;
@@ -666,7 +676,7 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
         date: shift.date,
         code: shift.code,
         vehicleCode: shift.vehicleCode,
-        vehicleKind: shift.vehicleKind,
+        vehicleKinds: shift.vehicleKinds,
         fleetNumber: saved,
         affectation: shift.affectation,
         affectationLabel: shift.affectationLabel,
@@ -742,7 +752,7 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
               </Text>
             </View>
           ) : null}
-          {!isAbsence && kindLabel ? (
+          {!isAbsence && kindLabels.length > 0 ? (
             <View
               style={[
                 styles.tag,
@@ -755,7 +765,7 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
               ]}
             >
               <Text style={[styles.tagLabel, { color: colors.mutedForeground }]}>
-                {kindLabel}
+                {kindLabels.join(" · ")}
               </Text>
             </View>
           ) : null}

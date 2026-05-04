@@ -128,9 +128,11 @@ export function calcNightMinutes(
   nightEndMin: number,
 ): number {
   if (startMin >= endMin) return 0;
-  const overlap = (wStart: number, wEnd: number) =>
-    Math.max(0, Math.min(endMin, wEnd) - Math.max(startMin, wStart));
-  return overlap(nightStartMin, 1440) + overlap(0, nightEndMin);
+  // Window 1: [nightStartMin, 1440) — late night portion
+  const w1 = Math.max(0, Math.min(endMin, 1440) - Math.max(startMin, nightStartMin));
+  // Window 2: [0, nightEndMin) shifted to [1440, 1440+nightEndMin) for overnight shifts
+  const w2 = Math.max(0, Math.min(endMin, 1440 + nightEndMin) - Math.max(startMin, 1440));
+  return w1 + w2;
 }
 
 export interface ShiftCalc {

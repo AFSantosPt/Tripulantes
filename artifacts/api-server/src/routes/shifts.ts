@@ -8,9 +8,22 @@ const ABSENCE_TYPES = new Set(["folga", "ferias"]);
 
 interface ShiftStop { location: string; time: string; }
 
+function parseVehicleKinds(raw: any): string[] | undefined {
+  if (raw == null) return undefined;
+  const s = String(raw).trim();
+  if (!s) return undefined;
+  try {
+    const parsed = JSON.parse(s);
+    if (Array.isArray(parsed)) return parsed.length > 0 ? parsed : undefined;
+    return [String(parsed)];
+  } catch {
+    return [s];
+  }
+}
+
 interface Shift {
   id: string; crewMemberId: string; date: string; code?: string; vehicleCode?: string;
-  vehicleKind?: string; fleetNumber?: string;
+  vehicleKinds?: string[]; fleetNumber?: string;
   affectation: string; affectationLabel?: string; stops: ShiftStop[];
   notes?: string; availableForSwap?: boolean; createdAt: string;
 }
@@ -19,7 +32,7 @@ function rowToShift(row: any): Shift {
   return {
     id: row.id, crewMemberId: row.crew_member_id, date: row.date,
     code: row.code ?? undefined, vehicleCode: row.vehicle_code ?? undefined,
-    vehicleKind: row.vehicle_kind ?? undefined, fleetNumber: row.fleet_number ?? undefined,
+    vehicleKinds: parseVehicleKinds(row.vehicle_kind), fleetNumber: row.fleet_number ?? undefined,
     affectation: row.affectation, affectationLabel: row.affectation_label ?? undefined,
     stops: row.stops ?? [], notes: row.notes ?? undefined,
     availableForSwap: row.available_for_swap ?? false,
@@ -172,7 +185,8 @@ router.post("/shifts", async (req, res) => {
   const r = await pool.query(
     `INSERT INTO shifts (id,crew_member_id,date,code,vehicle_code,vehicle_kind,fleet_number,affectation,affectation_label,stops,notes,available_for_swap,created_at,updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW(),NOW()) RETURNING *`,
-    [id, member.id, body.date, body.code ?? null, body.vehicleCode ?? null, body.vehicleKind ?? null,
+    [id, member.id, body.date, body.code ?? null, body.vehicleCode ?? null,
+     Array.isArray(body.vehicleKinds) && body.vehicleKinds.length > 0 ? JSON.stringify(body.vehicleKinds) : null,
      body.fleetNumber ?? null,
      body.affectation, body.affectationLabel ?? null, JSON.stringify(body.stops), body.notes ?? null, body.availableForSwap ?? false],
   );
@@ -212,7 +226,8 @@ router.put("/shifts/:id", async (req, res) => {
   }
   const r = await pool.query(
     `UPDATE shifts SET date=$1,code=$2,vehicle_code=$3,vehicle_kind=$4,fleet_number=$5,affectation=$6,affectation_label=$7,stops=$8,notes=$9,available_for_swap=$10,updated_at=NOW() WHERE id=$11 RETURNING *`,
-    [body.date, body.code ?? null, body.vehicleCode ?? null, body.vehicleKind ?? null,
+    [body.date, body.code ?? null, body.vehicleCode ?? null,
+     Array.isArray(body.vehicleKinds) && body.vehicleKinds.length > 0 ? JSON.stringify(body.vehicleKinds) : null,
      body.fleetNumber ?? null,
      body.affectation, body.affectationLabel ?? null, JSON.stringify(body.stops),
      body.notes ?? null, body.availableForSwap ?? false, req.params.id],

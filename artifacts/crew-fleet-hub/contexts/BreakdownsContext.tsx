@@ -71,6 +71,7 @@ interface BreakdownsState {
   }) => Promise<Breakdown>;
   editBreakdown: (id: string, input: { vehicleKind: VehicleKind; fleetNumber: string; description: string }) => Promise<{ ok: boolean; reason?: string }>;
   confirmRepair: (id: string) => Promise<{ ok: boolean; reason?: string }>;
+  forceResolve: (id: string) => Promise<{ ok: boolean; reason?: string }>;
   removeBreakdown: (id: string) => Promise<void>;
   addPhoto: (
     breakdownId: string,
@@ -174,6 +175,28 @@ export function BreakdownsProvider({
     [user],
   );
 
+  const forceResolve = useCallback<BreakdownsState["forceResolve"]>(
+    async (id) => {
+      if (!user) return { ok: false, reason: "Sem sessão iniciada" };
+      try {
+        const res = await apiFetch(`/api/breakdowns/${id}/force-resolve`, {
+          method: "POST",
+          memberId: user.id,
+        });
+        const data = await res.json();
+        if (!res.ok) return { ok: false, reason: data.error };
+        setBreakdowns((prev) =>
+          prev.map((b) => (b.id === id ? (data.breakdown as Breakdown) : b)),
+        );
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof NetworkError ? err.message : "Erro de ligação";
+        return { ok: false, reason: msg };
+      }
+    },
+    [user],
+  );
+
   const removeBreakdown = useCallback(
     async (id: string) => {
       if (!user) return;
@@ -253,6 +276,7 @@ export function BreakdownsProvider({
       reportBreakdown,
       editBreakdown,
       confirmRepair,
+      forceResolve,
       removeBreakdown,
       addPhoto,
       removePhoto,
@@ -264,6 +288,7 @@ export function BreakdownsProvider({
     reportBreakdown,
     editBreakdown,
     confirmRepair,
+    forceResolve,
     removeBreakdown,
     addPhoto,
     removePhoto,

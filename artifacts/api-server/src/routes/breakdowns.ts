@@ -79,6 +79,26 @@ router.post("/breakdowns/:id/confirm", async (req, res) => {
   res.json({ breakdown: rowToBreakdown(r.rows[0]) });
 });
 
+router.post("/breakdowns/:id/force-resolve", async (req, res) => {
+  const member = await requireActiveMember(req.headers["x-member-id"] as string);
+  if (!member) { res.status(403).json({ error: "Sem permissão" }); return; }
+  const existing = await pool.query("SELECT * FROM breakdowns WHERE id=$1", [req.params.id]);
+  if (!existing.rows[0]) { res.status(404).json({ error: "Avaria não encontrada" }); return; }
+  if (existing.rows[0].reported_by_id !== member.id && !member.isAdmin) {
+    res.status(403).json({ error: "Só o autor pode marcar como reparada diretamente" }); return;
+  }
+  const b = rowToBreakdown(existing.rows[0]);
+  if (b.confirmations.length >= REQUIRED_CONFIRMATIONS) {
+    res.status(400).json({ error: "Avaria já resolvida" }); return;
+  }
+  const now = new Date().toISOString();
+  const conf: Confirmation = { crewMemberId: member.id, crewMemberName: member.name, crewIdLabel: member.crewId, at: now };
+  const filled: Confirmation[] = Array.from({ length: REQUIRED_CONFIRMATIONS }, () => ({ ...conf }));
+  const r = await pool.query("UPDATE breakdowns SET confirmations=$1 WHERE id=$2 RETURNING *", [JSON.stringify(filled), req.params.id]);
+  broadcast("breakdowns");
+  res.json({ breakdown: rowToBreakdown(r.rows[0]) });
+});
+
 router.patch("/breakdowns/:id", async (req, res) => {
   const member = await requireActiveMember(req.headers["x-member-id"] as string);
   if (!member) { res.status(403).json({ error: "Sem permissão" }); return; }

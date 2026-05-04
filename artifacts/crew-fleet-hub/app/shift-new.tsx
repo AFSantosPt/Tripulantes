@@ -44,7 +44,7 @@ const CATEGORY_VEHICLE_MAP: Record<string, VehicleKind[]> = {
 
 function vehicleOptionsForCategories(
   categories: string[],
-): { value: VehicleKind; label: string }[] {
+): { value: string; label: string }[] {
   const kindSet = new Set<VehicleKind>();
   for (const cat of categories) {
     for (const kind of CATEGORY_VEHICLE_MAP[cat] ?? []) kindSet.add(kind);
@@ -54,12 +54,12 @@ function vehicleOptionsForCategories(
     kindSet.add("eletrico");
     kindSet.add("ascensor");
   }
-  const all: { value: VehicleKind; label: string }[] = [
+  const main: { value: string; label: string }[] = [
     { value: "autocarro", label: "Autocarro" },
     { value: "eletrico", label: "Eléctrico" },
     { value: "ascensor", label: "Ascensor" },
-  ];
-  return all.filter((o) => kindSet.has(o.value));
+  ].filter((o) => kindSet.has(o.value as VehicleKind));
+  return [...main, { value: "outro", label: "Outro" }];
 }
 
 interface DraftStop {
@@ -80,8 +80,6 @@ export default function NewShiftScreen() {
   const { active: activeBreakdowns } = useBreakdowns();
 
   const vehicleOptions = vehicleOptionsForCategories(user?.categories ?? []);
-  const defaultVehicleKind: VehicleKind | undefined =
-    vehicleOptions.length === 1 ? vehicleOptions[0].value : undefined;
 
   const initialDate =
     typeof params.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(params.date)
@@ -97,7 +95,7 @@ export default function NewShiftScreen() {
   );
   const [code, setCode] = useState<string>("");
   const [vehicleCode, setVehicleCode] = useState<string>("");
-  const [vehicleKind, setVehicleKind] = useState<VehicleKind | undefined>(defaultVehicleKind);
+  const [vehicleKinds, setVehicleKinds] = useState<string[]>([]);
   const [fleetNumber, setFleetNumber] = useState<string>("");
   const [affectation, setAffectation] = useState<AffectationType>("normal");
   const [start, setStart] = useState<DraftStop>(EMPTY_STOP);
@@ -110,7 +108,7 @@ export default function NewShiftScreen() {
   );
   const [errors, setErrors] = useState<{
     date?: string;
-    vehicleKind?: string;
+    vehicleKinds?: string;
     start?: { location?: string; time?: string };
     end?: { location?: string; time?: string };
     range?: string;
@@ -127,7 +125,7 @@ export default function NewShiftScreen() {
     setDateInput(isoToDisplayDate(existing.date));
     setCode(existing.code ?? "");
     setVehicleCode(existing.vehicleCode ?? "");
-    setVehicleKind((existing.vehicleKind as VehicleKind | undefined) ?? defaultVehicleKind);
+    setVehicleKinds(existing.vehicleKinds ?? []);
     setFleetNumber(existing.fleetNumber ?? "");
     setAffectation(existing.affectation);
     const first = existing.stops[0];
@@ -170,7 +168,7 @@ export default function NewShiftScreen() {
     setEditingId(null);
     setCode("");
     setVehicleCode("");
-    setVehicleKind(defaultVehicleKind);
+    setVehicleKinds([]);
     setFleetNumber("");
     setAffectation("normal");
     setStart(EMPTY_STOP);
@@ -207,10 +205,6 @@ export default function NewShiftScreen() {
     }
 
     if (!isAbsenceType) {
-      if (!vehicleKind) {
-        next.vehicleKind = "Obrigatório selecionar o tipo de veículo";
-      }
-
       const startTimeMin = parseTimeToMinutes(start.time);
       const endTimeMin = parseTimeToMinutes(end.time);
       const startErr: { location?: string; time?: string } = {};
@@ -291,7 +285,7 @@ export default function NewShiftScreen() {
         date: iso!,
         code: isAbsenceType ? undefined : code.trim() || undefined,
         vehicleCode: isAbsenceType ? undefined : vehicleCode.trim() || undefined,
-        vehicleKind: isAbsenceType ? undefined : vehicleKind,
+        vehicleKinds: isAbsenceType ? [] : vehicleKinds,
         fleetNumber: savedFleetNumber,
         affectation,
         stops: cleanedStops,
@@ -517,29 +511,22 @@ export default function NewShiftScreen() {
                   </View>
                 </View>
 
-                {vehicleOptions.length > 1 ? (
-                  <View style={{ gap: 6 }}>
-                    <Text
-                      style={[
-                        styles.label,
-                        {
-                          color: errors.vehicleKind
-                            ? colors.destructive
-                            : colors.foreground,
-                        },
-                      ]}
-                    >
+                <View style={{ gap: 6 }}>
+                    <Text style={[styles.label, { color: colors.foreground }]}>
                       Tipo de veículo
                     </Text>
                     <View style={styles.chipRow}>
                       {vehicleOptions.map((opt) => {
-                        const selected = vehicleKind === opt.value;
+                        const selected = vehicleKinds.includes(opt.value);
                         return (
                           <Pressable
                             key={opt.value}
                             onPress={() => {
-                              setVehicleKind(opt.value);
-                              setErrors((e) => ({ ...e, vehicleKind: undefined }));
+                              setVehicleKinds((prev) =>
+                                prev.includes(opt.value)
+                                  ? prev.filter((k) => k !== opt.value)
+                                  : [...prev, opt.value],
+                              );
                             }}
                             style={({ pressed }) => [
                               styles.chip,
@@ -549,8 +536,6 @@ export default function NewShiftScreen() {
                                   : colors.card,
                                 borderColor: selected
                                   ? colors.primary
-                                  : errors.vehicleKind
-                                  ? colors.destructive
                                   : colors.border,
                                 borderRadius: colors.radius,
                                 opacity: pressed ? 0.8 : 1,
@@ -560,11 +545,7 @@ export default function NewShiftScreen() {
                             <Text
                               style={[
                                 styles.chipLabel,
-                                {
-                                  color: selected
-                                    ? "#fff"
-                                    : colors.foreground,
-                                },
+                                { color: selected ? "#fff" : colors.foreground },
                               ]}
                             >
                               {opt.label}
@@ -573,15 +554,7 @@ export default function NewShiftScreen() {
                         );
                       })}
                     </View>
-                    {errors.vehicleKind ? (
-                      <Text
-                        style={[styles.errorText, { color: colors.destructive }]}
-                      >
-                        {errors.vehicleKind}
-                      </Text>
-                    ) : null}
                   </View>
-                ) : null}
 
                 <StopCard
                   label="Início"

@@ -38,6 +38,7 @@ export default function BreakdownDetailScreen() {
   const {
     byId,
     confirmRepair,
+    forceResolve,
     removeBreakdown,
     addPhoto,
     removePhoto,
@@ -96,7 +97,21 @@ export default function BreakdownDetailScreen() {
     user != null &&
     breakdown.confirmations.some((c) => c.crewMemberId === user.id);
 
-  const canConfirm = !resolved && !userConfirmed;
+  const canConfirm = !isReporter && !resolved && !userConfirmed;
+
+  const handleForceResolve = async () => {
+    setSubmitting(true);
+    setFeedback(null);
+    try {
+      const res = await forceResolve(breakdown.id);
+      if (!res.ok && res.reason) setFeedback(res.reason);
+      else if (res.ok && Platform.OS !== "web") {
+        try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleConfirm = async () => {
     setSubmitting(true);
@@ -201,7 +216,7 @@ export default function BreakdownDetailScreen() {
                 <Feather name="edit-2" size={18} color={colors.foreground} />
               </Pressable>
             ) : null}
-            {(isReporter || user?.isAdmin) ? (
+            {((isReporter && !resolved) || user?.isAdmin) ? (
               <Pressable
                 onPress={handleDelete}
                 style={({ pressed }) => [
@@ -216,9 +231,6 @@ export default function BreakdownDetailScreen() {
               >
                 <Feather name="trash-2" size={18} color={colors.destructive} />
               </Pressable>
-            ) : null}
-            {!user?.isAdmin && !isReporter ? (
-              <View style={{ width: 44 }} />
             ) : null}
           </View>
         </View>
@@ -600,7 +612,14 @@ export default function BreakdownDetailScreen() {
           </View>
         ) : null}
 
-        {canConfirm ? (
+        {isReporter && !resolved ? (
+          <PrimaryButton
+            label="Marcar como reparada"
+            icon="check-circle"
+            onPress={handleForceResolve}
+            loading={submitting}
+          />
+        ) : canConfirm ? (
           <PrimaryButton
             label={`Confirmar reparação (${count + 1}/${required})`}
             icon="check-circle"
