@@ -35,31 +35,17 @@ import {
   todayIso,
 } from "@/utils/time";
 
-const CATEGORY_VEHICLE_MAP: Record<string, VehicleKind[]> = {
-  motorista: ["autocarro"],
-  "guarda-freio": ["eletrico"],
-  ascensor: ["ascensor"],
-  outro: ["autocarro", "eletrico", "ascensor"],
-};
+const ALL_VEHICLE_OPTIONS: { value: string; label: string }[] = [
+  { value: "autocarro", label: "Autocarro" },
+  { value: "eletrico", label: "Eléctrico" },
+  { value: "ascensor", label: "Ascensor" },
+  { value: "outro", label: "Outro" },
+];
 
 function vehicleOptionsForCategories(
-  categories: string[],
+  _categories: string[],
 ): { value: string; label: string }[] {
-  const kindSet = new Set<VehicleKind>();
-  for (const cat of categories) {
-    for (const kind of CATEGORY_VEHICLE_MAP[cat] ?? []) kindSet.add(kind);
-  }
-  if (kindSet.size === 0) {
-    kindSet.add("autocarro");
-    kindSet.add("eletrico");
-    kindSet.add("ascensor");
-  }
-  const main: { value: string; label: string }[] = [
-    { value: "autocarro", label: "Autocarro" },
-    { value: "eletrico", label: "Eléctrico" },
-    { value: "ascensor", label: "Ascensor" },
-  ].filter((o) => kindSet.has(o.value as VehicleKind));
-  return [...main, { value: "outro", label: "Outro" }];
+  return ALL_VEHICLE_OPTIONS;
 }
 
 interface DraftStop {
