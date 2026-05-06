@@ -169,7 +169,7 @@ export default function CrewCategoriesScreen() {
         </Text>
 
         <View style={styles.options}>
-          {ALL_CREW_CATEGORIES.map((cat) => {
+          {ALL_CREW_CATEGORIES.filter((cat) => cat !== "outro" || user?.isAdmin).map((cat) => {
             const active = selected.includes(cat);
             return (
               <Pressable
