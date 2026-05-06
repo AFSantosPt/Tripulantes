@@ -128,6 +128,11 @@ export default function ShiftImportScreen() {
   const [resultMsg, setResultMsg] = useState<string | null>(null);
   const [ocrLoading, setOcrLoading] = useState<boolean>(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
+  const [ocrNeedsDate, setOcrNeedsDate] = useState<boolean>(false);
+  const [overrideDateDisplay, setOverrideDateDisplay] = useState<string>("");
+  const [overrideDateIso, setOverrideDateIso] = useState<string | null>(null);
+
+  const effectiveFallbackDate = overrideDateIso ?? fallbackDate;
 
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? Math.max(insets.top, 67) : insets.top;
@@ -145,7 +150,7 @@ export default function ShiftImportScreen() {
 
   const handleAnalyze = () => {
     setResultMsg(null);
-    const r = parseShiftImport(text, fallbackDate);
+    const r = parseShiftImport(text, effectiveFallbackDate);
     setAnalyzed(r);
     setEdits({});
     const initialSel: Record<number, boolean> = {};
@@ -167,6 +172,9 @@ export default function ShiftImportScreen() {
     setEdits({});
     setResultMsg(null);
     setOcrError(null);
+    setOcrNeedsDate(false);
+    setOverrideDateDisplay("");
+    setOverrideDateIso(null);
   };
 
   const handlePickImage = async () => {
@@ -199,9 +207,22 @@ export default function ShiftImportScreen() {
         );
         return;
       }
-      setText(extracted.trim());
+      const extractedText = extracted.trim();
+      setText(extractedText);
       setAnalyzed(null);
       setSelectedIds({});
+      const hasDate =
+        /\b\d{4}-\d{2}-\d{2}\b/.test(extractedText) ||
+        /\b\d{2}[-/]\d{2}[-/]\d{4}\b/.test(extractedText);
+      if (!hasDate) {
+        setOcrNeedsDate(true);
+        setOverrideDateDisplay(isoToDisplayDate(fallbackDate));
+        setOverrideDateIso(fallbackDate);
+      } else {
+        setOcrNeedsDate(false);
+        setOverrideDateDisplay("");
+        setOverrideDateIso(null);
+      }
     } catch (e: any) {
       setOcrError(`Erro: ${e?.message ?? "falha desconhecida"}`);
     } finally {
@@ -360,6 +381,55 @@ export default function ShiftImportScreen() {
             </View>
           ) : null}
 
+          {ocrNeedsDate ? (
+            <View
+              style={[
+                styles.dateBanner,
+                {
+                  backgroundColor: colors.accent + "18",
+                  borderColor: colors.accent,
+                  borderRadius: colors.radius,
+                },
+              ]}
+            >
+              <View style={styles.dateBannerTop}>
+                <Feather name="calendar" size={15} color={colors.accent} />
+                <Text style={[styles.dateBannerTitle, { color: colors.foreground }]}>
+                  Nenhuma data encontrada na imagem
+                </Text>
+              </View>
+              <Text style={[styles.dateBannerSub, { color: colors.mutedForeground }]}>
+                Confirma ou edita a data a aplicar a todos os serviços:
+              </Text>
+              <TextInput
+                value={overrideDateDisplay}
+                onChangeText={(v) => {
+                  setOverrideDateDisplay(v);
+                  const iso = displayDateToIso(v);
+                  if (iso) setOverrideDateIso(iso);
+                }}
+                placeholder="DD-MM-AAAA"
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="numeric"
+                maxLength={10}
+                style={[
+                  styles.dateBannerInput,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: overrideDateIso ? colors.accent : colors.destructive,
+                    borderRadius: colors.radius - 4,
+                    color: colors.foreground,
+                  },
+                ]}
+              />
+              {!overrideDateIso ? (
+                <Text style={[styles.dateBannerWarn, { color: colors.destructive }]}>
+                  Data inválida — usa o formato DD-MM-AAAA
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
           <View style={styles.orRow}>
             <View
               style={[styles.orLine, { backgroundColor: colors.border }]}
@@ -394,7 +464,7 @@ export default function ShiftImportScreen() {
           <Text style={[styles.smallHint, { color: colors.mutedForeground }]}>
             Se algum serviço não tiver data, é usada{" "}
             <Text style={{ fontFamily: "Inter_700Bold" }}>
-              {isoToDisplayDate(fallbackDate)}
+              {isoToDisplayDate(effectiveFallbackDate)}
             </Text>{" "}
             como data padrão.
           </Text>
@@ -969,6 +1039,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_500Medium",
     lineHeight: 18,
+  },
+  dateBanner: {
+    borderWidth: 1,
+    padding: 14,
+    gap: 8,
+  },
+  dateBannerTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  dateBannerTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    flex: 1,
+  },
+  dateBannerSub: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
+  },
+  dateBannerInput: {
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 1,
+  },
+  dateBannerWarn: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
   },
   orRow: {
     flexDirection: "row",
