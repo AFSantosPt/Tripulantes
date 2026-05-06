@@ -46,7 +46,6 @@ const ALL_VEHICLE_OPTIONS: { value: string; label: string }[] = [
   { value: "autocarro", label: "Autocarro" },
   { value: "eletrico", label: "Eléctrico" },
   { value: "ascensor", label: "Ascensor" },
-  { value: "outro", label: "Outro" },
 ];
 
 function vehicleOptionsForCategories(
@@ -58,10 +57,7 @@ function vehicleOptionsForCategories(
     for (const kind of CATEGORY_VEHICLE_MAP[cat] ?? []) kindSet.add(kind);
   }
   if (!kindSet.size) return ALL_VEHICLE_OPTIONS;
-  const main = ALL_VEHICLE_OPTIONS.filter(
-    (o) => o.value === "outro" || kindSet.has(o.value as VehicleKind),
-  );
-  return main;
+  return ALL_VEHICLE_OPTIONS.filter((o) => kindSet.has(o.value as VehicleKind));
 }
 
 interface DraftStop {

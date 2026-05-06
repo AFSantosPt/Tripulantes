@@ -9,7 +9,7 @@ const DEFAULT_ADMIN = {
 };
 
 export type AccountStatus = "pending" | "active" | "inactive";
-export type CrewCategory = "guarda-freio" | "motorista" | "outro";
+export type CrewCategory = "guarda-freio" | "motorista" | "ascensor" | "outro";
 
 export interface CrewMember {
   id: string;

@@ -16,6 +16,7 @@ import {
 const ALL_CREW_CATEGORIES: CrewCategory[] = [
   "guarda-freio",
   "motorista",
+  "ascensor",
   "outro",
 ];
 
