@@ -46,6 +46,7 @@ function detectAffectation(value: string): {
     if (/1|i\b|tipo\s*1/i.test(v)) return { type: "extra1", label: v };
     return { type: "extra1", label: v };
   }
+  if (lower.includes("condução") || lower.includes("conducao")) return { type: "normal" };
   if (lower.includes("normal")) return { type: "normal", label: v };
   return { type: "normal", label: v };
 }
