@@ -475,8 +475,8 @@ export default function TeamScreen() {
               Nº {user?.crewId}
               {user?.folgaGroup ? `  ·  Folga ${user.folgaGroup}` : ""}
             </Text>
-            {profileCategories ? (
-              <Text style={[styles.profileMeta, { color: colors.mutedForeground }]}>{profileCategories}</Text>
+            {user?.categories && user.categories.length > 0 ? (
+              <CategoryChips categories={user.categories} categoryOtherLabel={user.categoryOtherLabel} colors={colors} />
             ) : null}
           </View>
           <Pressable

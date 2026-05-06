@@ -17,6 +17,7 @@ interface MonthCalendarProps {
   onMonthChange?: (year: number, month: number) => void;
   markedDates?: string[];
   folgaDates?: string[];
+  feriadoDates?: string[];
   todayIso: string;
 }
 
@@ -104,6 +105,8 @@ function buildCells(year: number, month: number): Cell[] {
 
 const FOLGA_BG = "#F59E0B18";
 const FOLGA_DOT = "#F59E0B";
+const FERIADO_BG = "#2F855A18";
+const FERIADO_DOT = "#2F855A";
 
 export function MonthCalendar({
   selectedDate,
@@ -111,6 +114,7 @@ export function MonthCalendar({
   onMonthChange,
   markedDates = [],
   folgaDates = [],
+  feriadoDates = [],
   todayIso,
 }: MonthCalendarProps) {
   const colors = useColors();
@@ -142,6 +146,7 @@ export function MonthCalendar({
 
   const markedSet = useMemo(() => new Set(markedDates), [markedDates]);
   const folgaSet = useMemo(() => new Set(folgaDates), [folgaDates]);
+  const feriadoSet = useMemo(() => new Set(feriadoDates), [feriadoDates]);
 
   const goPrev = () => {
     setView((v) => {
@@ -212,77 +217,86 @@ export function MonthCalendar({
           const isToday = c.iso === todayIso;
           const hasMark = markedSet.has(c.iso);
           const isFolga = folgaSet.has(c.iso);
+          const isFeriado = feriadoSet.has(c.iso);
           const dim = !c.inMonth;
-          const innerSize = cellSize - 4; // subtract cell padding (2 each side)
+          const innerSize = Math.floor(cellSize) - 4;
+          const radius = Math.floor(innerSize / 2);
+
+          let bgColor: string | undefined;
+          let borderColor: string | undefined;
+          let borderWidth: number | undefined;
+          let textColor: string;
+          let fontFamily: string;
+          let dotColor: string | undefined;
+
+          if (isSelected) {
+            bgColor = colors.accent;
+            textColor = colors.accentForeground;
+            fontFamily = "Inter_700Bold";
+            if (isFolga) dotColor = FOLGA_DOT;
+            else if (isFeriado) dotColor = FERIADO_DOT;
+            else if (hasMark) dotColor = colors.accentForeground;
+          } else if (isFeriado && c.inMonth) {
+            bgColor = FERIADO_BG;
+            borderColor = FERIADO_DOT + "55";
+            borderWidth = 1;
+            textColor = FERIADO_DOT;
+            fontFamily = "Inter_700Bold";
+            if (hasMark) dotColor = FERIADO_DOT;
+          } else if (isFolga && c.inMonth) {
+            bgColor = FOLGA_BG;
+            borderColor = FOLGA_DOT + "55";
+            borderWidth = 1;
+            textColor = FOLGA_DOT;
+            fontFamily = "Inter_700Bold";
+            if (hasMark) dotColor = FOLGA_DOT;
+          } else {
+            textColor = dim ? colors.mutedForeground : colors.foreground;
+            fontFamily = isToday ? "Inter_700Bold" : "Inter_500Medium";
+            if (isToday) {
+              borderColor = colors.primary;
+              borderWidth = 1.5;
+            }
+            if (hasMark) dotColor = colors.primary;
+          }
+
           return (
             <Pressable
               key={c.iso + (c.inMonth ? "" : "-out")}
               onPress={() => onSelectDate(c.iso)}
               style={({ pressed }) => ({
-                width: cellSize,
-                height: cellSize,
+                width: Math.floor(cellSize),
+                height: Math.floor(cellSize),
                 padding: 2,
-                opacity: pressed ? 0.7 : 1,
+                opacity: pressed ? 0.7 : (dim ? 0.4 : 1),
                 alignItems: "center",
                 justifyContent: "center",
               })}
             >
               <View
-                style={[
-                  {
-                    width: innerSize,
-                    height: innerSize,
-                    borderRadius: innerSize / 2,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    position: "relative",
-                  },
-                  !isSelected && isFolga && c.inMonth && {
-                    backgroundColor: FOLGA_BG,
-                    borderWidth: 1,
-                    borderColor: FOLGA_DOT + "55",
-                  },
-                  isSelected && {
-                    backgroundColor: colors.accent,
-                  },
-                  !isSelected && isToday && {
-                    borderWidth: 1.5,
-                    borderColor: colors.primary,
-                  },
-                ]}
+                style={{
+                  width: innerSize,
+                  height: innerSize,
+                  borderRadius: radius,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  position: "relative",
+                  backgroundColor: bgColor,
+                  borderWidth: borderWidth,
+                  borderColor: borderColor,
+                }}
               >
                 <Text
                   style={[
                     styles.cellText,
-                    {
-                      color: isSelected
-                        ? colors.accentForeground
-                        : isFolga && c.inMonth
-                          ? FOLGA_DOT
-                          : dim
-                            ? colors.mutedForeground
-                            : colors.foreground,
-                      opacity: dim ? 0.4 : 1,
-                      fontFamily: isSelected
-                        ? "Inter_700Bold"
-                        : isToday || (isFolga && c.inMonth)
-                          ? "Inter_700Bold"
-                          : "Inter_500Medium",
-                    },
+                    { color: textColor, fontFamily },
                   ]}
                 >
                   {c.day}
                 </Text>
-                {hasMark || (isFolga && isSelected) ? (
+                {dotColor ? (
                   <View
-                    style={[
-                      styles.dot,
-                      {
-                        backgroundColor: hasMark
-                          ? (isSelected ? colors.accentForeground : colors.primary)
-                          : FOLGA_DOT,
-                      },
-                    ]}
+                    style={[styles.dot, { backgroundColor: dotColor }]}
                   />
                 ) : null}
               </View>

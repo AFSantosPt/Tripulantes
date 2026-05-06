@@ -117,7 +117,24 @@ export default function ShiftsScreen() {
   }, [rangeShifts, nightStartMin, nightEndMin]);
 
   const markedDates = useMemo(
-    () => Array.from(new Set(shifts.map((s) => s.date))),
+    () =>
+      Array.from(
+        new Set(
+          shifts
+            .filter((s) => s.affectation !== "normalFO")
+            .map((s) => s.date),
+        ),
+      ),
+    [shifts],
+  );
+
+  const feriadoDates = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          shifts.filter((s) => s.affectation === "normalFO").map((s) => s.date),
+        ),
+      ),
     [shifts],
   );
 
@@ -471,6 +488,7 @@ export default function ShiftsScreen() {
           onMonthChange={handleMonthChange}
           markedDates={markedDates}
           folgaDates={folgaDates}
+          feriadoDates={feriadoDates}
           todayIso={today}
         />
 

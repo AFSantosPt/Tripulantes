@@ -35,6 +35,13 @@ import {
   todayIso,
 } from "@/utils/time";
 
+const CATEGORY_VEHICLE_MAP: Record<string, VehicleKind[]> = {
+  motorista: ["autocarro"],
+  "guarda-freio": ["eletrico"],
+  ascensor: ["ascensor"],
+  outro: ["autocarro", "eletrico", "ascensor"],
+};
+
 const ALL_VEHICLE_OPTIONS: { value: string; label: string }[] = [
   { value: "autocarro", label: "Autocarro" },
   { value: "eletrico", label: "Eléctrico" },
@@ -43,9 +50,18 @@ const ALL_VEHICLE_OPTIONS: { value: string; label: string }[] = [
 ];
 
 function vehicleOptionsForCategories(
-  _categories: string[],
+  categories: string[],
 ): { value: string; label: string }[] {
-  return ALL_VEHICLE_OPTIONS;
+  if (!categories.length) return ALL_VEHICLE_OPTIONS;
+  const kindSet = new Set<VehicleKind>();
+  for (const cat of categories) {
+    for (const kind of CATEGORY_VEHICLE_MAP[cat] ?? []) kindSet.add(kind);
+  }
+  if (!kindSet.size) return ALL_VEHICLE_OPTIONS;
+  const main = ALL_VEHICLE_OPTIONS.filter(
+    (o) => o.value === "outro" || kindSet.has(o.value as VehicleKind),
+  );
+  return main;
 }
 
 interface DraftStop {
@@ -456,6 +472,17 @@ export default function NewShiftScreen() {
                                 clearTimeout(codeSuggestHideTimer.current);
                               setCode(suggestion);
                               setCodeFocused(false);
+                              const match = shifts
+                                .filter((s) => s.code?.trim().toUpperCase() === suggestion.toUpperCase())
+                                .sort((a, b) => b.date.localeCompare(a.date))[0];
+                              if (match) {
+                                if (match.vehicleCode) setVehicleCode(match.vehicleCode);
+                                if (match.vehicleKinds?.length) setVehicleKinds(match.vehicleKinds);
+                                const first = match.stops[0];
+                                const last = match.stops[match.stops.length - 1];
+                                if (first?.location) setStart({ location: first.location, time: first.time });
+                                if (last?.location) setEnd({ location: last.location, time: last.time });
+                              }
                             }}
                             style={({ pressed }) => [
                               styles.suggestChip,
