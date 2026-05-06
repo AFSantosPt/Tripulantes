@@ -24,7 +24,9 @@ import {
 import { useShifts } from "@/contexts/ShiftsContext";
 import { useColors } from "@/hooks/useColors";
 import {
+  AffectationType,
   affectationDisplay,
+  displayDateToIso,
   isoToDisplayDate,
   todayIso,
 } from "@/utils/time";
@@ -121,6 +123,7 @@ export default function ShiftImportScreen() {
   const [analyzed, setAnalyzed] = useState<ImportResult | null>(null);
   const [selectedIds, setSelectedIds] = useState<Record<number, boolean>>({});
   const [vehicleKinds, setVehicleKinds] = useState<Record<number, VehicleKind>>({});
+  const [edits, setEdits] = useState<Record<number, Partial<ParsedShift>>>({});
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
   const [ocrLoading, setOcrLoading] = useState<boolean>(false);
@@ -144,6 +147,7 @@ export default function ShiftImportScreen() {
     setResultMsg(null);
     const r = parseShiftImport(text, fallbackDate);
     setAnalyzed(r);
+    setEdits({});
     const initialSel: Record<number, boolean> = {};
     const initialKinds: Record<number, VehicleKind> = {};
     r.shifts.forEach((s, idx) => {
@@ -160,6 +164,7 @@ export default function ShiftImportScreen() {
     setAnalyzed(null);
     setSelectedIds({});
     setVehicleKinds({});
+    setEdits({});
     setResultMsg(null);
     setOcrError(null);
   };
@@ -221,7 +226,7 @@ export default function ShiftImportScreen() {
     try {
       for (let i = 0; i < analyzed.shifts.length; i++) {
         if (!selectedIds[i]) continue;
-        const s = analyzed.shifts[i];
+        const s = { ...analyzed.shifts[i], ...edits[i] };
         if (!isValidParsedShift(s)) {
           skipped++;
           continue;
@@ -436,6 +441,10 @@ export default function ShiftImportScreen() {
               onVehicleKindChange={(idx, kind) =>
                 setVehicleKinds((prev) => ({ ...prev, [idx]: kind }))
               }
+              edits={edits}
+              onEdit={(idx, patch) =>
+                setEdits((prev) => ({ ...prev, [idx]: { ...prev[idx], ...patch } }))
+              }
             />
           ) : null}
 
@@ -486,6 +495,8 @@ function AnalyzedSection({
   vehicleKinds,
   vehicleOptions,
   onVehicleKindChange,
+  edits,
+  onEdit,
 }: {
   result: ImportResult;
   selected: Record<number, boolean>;
@@ -494,6 +505,8 @@ function AnalyzedSection({
   vehicleKinds: Record<number, VehicleKind>;
   vehicleOptions: VehicleKind[];
   onVehicleKindChange: (idx: number, kind: VehicleKind) => void;
+  edits: Record<number, Partial<ParsedShift>>;
+  onEdit: (idx: number, patch: Partial<ParsedShift>) => void;
 }) {
   const colors = useColors();
   if (result.shifts.length === 0) {
@@ -549,20 +562,24 @@ function AnalyzedSection({
             : "texto"}
         )
       </Text>
-      {result.shifts.map((s, idx) => (
-        <ParsedShiftRow
-          key={idx}
-          shift={s}
-          checked={!!selected[idx]}
-          onToggle={() => onToggle(idx)}
-          isDuplicate={existingKeySet.has(
-            `${s.date}|${s.startTime}|${s.endTime}`,
-          )}
-          vehicleKind={vehicleKinds[idx]}
-          vehicleOptions={vehicleOptions}
-          onVehicleKindChange={(kind) => onVehicleKindChange(idx, kind)}
-        />
-      ))}
+      {result.shifts.map((s, idx) => {
+        const effective = { ...s, ...edits[idx] };
+        return (
+          <ParsedShiftRow
+            key={idx}
+            shift={effective}
+            checked={!!selected[idx]}
+            onToggle={() => onToggle(idx)}
+            isDuplicate={existingKeySet.has(
+              `${effective.date}|${effective.startTime}|${effective.endTime}`,
+            )}
+            vehicleKind={vehicleKinds[idx]}
+            vehicleOptions={vehicleOptions}
+            onVehicleKindChange={(kind) => onVehicleKindChange(idx, kind)}
+            onEdit={(patch) => onEdit(idx, patch)}
+          />
+        );
+      })}
       {result.warnings.length > 0 ? (
         <View
           style={[
@@ -596,6 +613,13 @@ function AnalyzedSection({
   );
 }
 
+const AFF_OPTIONS: { value: AffectationType; label: string }[] = [
+  { value: "normal", label: "Normal" },
+  { value: "normalFO", label: "Normal FO" },
+  { value: "extra1", label: "Extra 1" },
+  { value: "extra2", label: "Extra 2" },
+];
+
 function ParsedShiftRow({
   shift,
   checked,
@@ -604,6 +628,7 @@ function ParsedShiftRow({
   vehicleKind,
   vehicleOptions,
   onVehicleKindChange,
+  onEdit,
 }: {
   shift: ParsedShift;
   checked: boolean;
@@ -612,123 +637,274 @@ function ParsedShiftRow({
   vehicleKind?: VehicleKind;
   vehicleOptions: VehicleKind[];
   onVehicleKindChange: (kind: VehicleKind) => void;
+  onEdit: (patch: Partial<ParsedShift>) => void;
 }) {
   const colors = useColors();
   const valid = isValidParsedShift(shift);
+  const [editing, setEditing] = useState(false);
+  const [dateDisplay, setDateDisplay] = useState(isoToDisplayDate(shift.date));
+
+  const inputStyle = [
+    styles.editInput,
+    {
+      backgroundColor: colors.background,
+      borderColor: colors.border,
+      borderRadius: colors.radius / 2,
+      color: colors.foreground,
+    },
+  ];
+
   return (
-    <Pressable
-      onPress={onToggle}
-      disabled={!valid}
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.parsedCard,
         {
           backgroundColor: colors.card,
           borderColor: checked ? colors.primary : colors.border,
           borderRadius: colors.radius,
           borderWidth: checked ? 2 : 1,
-          opacity: pressed ? 0.85 : valid ? 1 : 0.6,
+          opacity: valid ? 1 : 0.6,
         },
       ]}
     >
-      <View
-        style={[
-          styles.checkbox,
-          {
-            backgroundColor: checked ? colors.primary : "transparent",
-            borderColor: checked ? colors.primary : colors.border,
-          },
-        ]}
-      >
-        {checked ? <Feather name="check" size={14} color="#FFFFFF" /> : null}
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <View style={styles.parsedHeadRow}>
-          <Text style={[styles.parsedDate, { color: colors.foreground }]}>
-            {isoToDisplayDate(shift.date)}
-          </Text>
-          {!valid ? (
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: colors.destructive },
-              ]}
-            >
-              <Text style={styles.statusBadgeText}>Inválido</Text>
-            </View>
-          ) : isDuplicate ? (
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: colors.mutedForeground },
-              ]}
-            >
-              <Text style={styles.statusBadgeText}>Já existe</Text>
-            </View>
-          ) : null}
-        </View>
-        <Text style={[styles.parsedCode, { color: colors.primary }]}>
-          {shift.code?.trim() || "Sem código"}
-          {shift.vehicleCode ? `  ·  ${shift.vehicleCode}` : ""}
-        </Text>
-        <Text
-          style={[styles.parsedAff, { color: colors.mutedForeground }]}
-          numberOfLines={1}
+      {/* Top row: checkbox + date + badges + edit toggle */}
+      <View style={styles.parsedCardTop}>
+        <Pressable
+          onPress={onToggle}
+          disabled={!valid}
+          style={({ pressed }) => [
+            styles.checkbox,
+            {
+              backgroundColor: checked ? colors.primary : "transparent",
+              borderColor: checked ? colors.primary : colors.border,
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}
         >
-          {affectationDisplay(shift.affectation, shift.affectationLabel)}
-        </Text>
-        <View style={styles.stopsRow}>
-          <Text
-            style={[styles.stopText, { color: colors.foreground }]}
-            numberOfLines={1}
-          >
-            {shift.startLocation}
+          {checked ? <Feather name="check" size={14} color="#FFFFFF" /> : null}
+        </Pressable>
+
+        <Pressable
+          onPress={onToggle}
+          disabled={!valid}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.parsedHeadRow}>
+            <Text style={[styles.parsedDate, { color: colors.foreground }]}>
+              {isoToDisplayDate(shift.date)}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+              {!valid ? (
+                <View style={[styles.statusBadge, { backgroundColor: colors.destructive }]}>
+                  <Text style={styles.statusBadgeText}>Inválido</Text>
+                </View>
+              ) : isDuplicate ? (
+                <View style={[styles.statusBadge, { backgroundColor: colors.mutedForeground }]}>
+                  <Text style={styles.statusBadgeText}>Já existe</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+          <Text style={[styles.parsedCode, { color: colors.primary }]}>
+            {shift.code?.trim() || "Sem código"}
+            {shift.vehicleCode ? `  ·  ${shift.vehicleCode}` : ""}
           </Text>
-          <Text style={[styles.stopTime, { color: colors.foreground }]}>
-            {shift.startTime}
+          <Text style={[styles.parsedAff, { color: colors.mutedForeground }]} numberOfLines={1}>
+            {affectationDisplay(shift.affectation, shift.affectationLabel)}
           </Text>
-        </View>
-        <View style={styles.stopsRow}>
-          <Text
-            style={[styles.stopText, { color: colors.foreground }]}
-            numberOfLines={1}
-          >
-            {shift.endLocation}
+          <View style={styles.stopsRow}>
+            <Text style={[styles.stopText, { color: colors.foreground }]} numberOfLines={1}>
+              {shift.startLocation}
+            </Text>
+            <Text style={[styles.stopTime, { color: colors.foreground }]}>{shift.startTime}</Text>
+          </View>
+          <View style={styles.stopsRow}>
+            <Text style={[styles.stopText, { color: colors.foreground }]} numberOfLines={1}>
+              {shift.endLocation}
+            </Text>
+            <Text style={[styles.stopTime, { color: colors.foreground }]}>{shift.endTime}</Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setEditing((e) => !e)}
+          style={({ pressed }) => [
+            styles.editToggleBtn,
+            {
+              backgroundColor: editing ? colors.primary + "18" : "transparent",
+              borderRadius: colors.radius / 2,
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}
+        >
+          <Feather
+            name={editing ? "check-square" : "edit-2"}
+            size={15}
+            color={editing ? colors.primary : colors.mutedForeground}
+          />
+        </Pressable>
+      </View>
+
+      {/* Inline edit panel */}
+      {editing ? (
+        <View
+          style={[
+            styles.editPanel,
+            { borderTopColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.editSectionLabel, { color: colors.mutedForeground }]}>
+            Corrigir dados reconhecidos
           </Text>
-          <Text style={[styles.stopTime, { color: colors.foreground }]}>
-            {shift.endTime}
-          </Text>
-        </View>
-        {vehicleOptions.length > 1 ? (
-          <View style={styles.vehicleChipRow}>
-            {vehicleOptions.map((k) => {
-              const active = vehicleKind === k;
-              return (
-                <Pressable
-                  key={k}
-                  onPress={() => onVehicleKindChange(k)}
-                  style={[
-                    styles.vehicleChip,
-                    {
-                      backgroundColor: active ? colors.primary : colors.muted,
-                      borderRadius: colors.radius / 1.5,
-                    },
-                  ]}
-                >
-                  <Text
+
+          {/* Date */}
+          <View style={styles.editRow}>
+            <Text style={[styles.editLabel, { color: colors.foreground }]}>Data</Text>
+            <TextInput
+              value={dateDisplay}
+              onChangeText={(v) => {
+                setDateDisplay(v);
+                const iso = displayDateToIso(v);
+                if (iso) onEdit({ date: iso });
+              }}
+              placeholder="DD-MM-AAAA"
+              placeholderTextColor={colors.mutedForeground}
+              style={[inputStyle, { flex: 1 }]}
+              keyboardType="numeric"
+            />
+          </View>
+
+          {/* Code + Vehicle */}
+          <View style={styles.editTwoCol}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.editLabel, { color: colors.foreground }]}>Código</Text>
+              <TextInput
+                value={shift.code ?? ""}
+                onChangeText={(v) => onEdit({ code: v || undefined })}
+                placeholder="Opcional"
+                placeholderTextColor={colors.mutedForeground}
+                style={inputStyle}
+                autoCapitalize="characters"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.editLabel, { color: colors.foreground }]}>Viatura</Text>
+              <TextInput
+                value={shift.vehicleCode ?? ""}
+                onChangeText={(v) => onEdit({ vehicleCode: v || undefined })}
+                placeholder="Opcional"
+                placeholderTextColor={colors.mutedForeground}
+                style={inputStyle}
+                autoCapitalize="characters"
+              />
+            </View>
+          </View>
+
+          {/* Start */}
+          <View style={styles.editRow}>
+            <Text style={[styles.editLabel, { color: colors.foreground, width: 46 }]}>Início</Text>
+            <TextInput
+              value={shift.startLocation}
+              onChangeText={(v) => onEdit({ startLocation: v })}
+              placeholder="Local"
+              placeholderTextColor={colors.mutedForeground}
+              style={[inputStyle, { flex: 1 }]}
+            />
+            <TextInput
+              value={shift.startTime}
+              onChangeText={(v) => onEdit({ startTime: v })}
+              placeholder="HH:MM"
+              placeholderTextColor={colors.mutedForeground}
+              style={[inputStyle, { width: 60 }]}
+              keyboardType="numeric"
+            />
+          </View>
+
+          {/* End */}
+          <View style={styles.editRow}>
+            <Text style={[styles.editLabel, { color: colors.foreground, width: 46 }]}>Fim</Text>
+            <TextInput
+              value={shift.endLocation}
+              onChangeText={(v) => onEdit({ endLocation: v })}
+              placeholder="Local"
+              placeholderTextColor={colors.mutedForeground}
+              style={[inputStyle, { flex: 1 }]}
+            />
+            <TextInput
+              value={shift.endTime}
+              onChangeText={(v) => onEdit({ endTime: v })}
+              placeholder="HH:MM"
+              placeholderTextColor={colors.mutedForeground}
+              style={[inputStyle, { width: 60 }]}
+              keyboardType="numeric"
+            />
+          </View>
+
+          {/* Affectation */}
+          <View style={{ gap: 6 }}>
+            <Text style={[styles.editLabel, { color: colors.foreground }]}>Tipo</Text>
+            <View style={styles.vehicleChipRow}>
+              {AFF_OPTIONS.map((opt) => {
+                const active = shift.affectation === opt.value;
+                return (
+                  <Pressable
+                    key={opt.value}
+                    onPress={() => onEdit({ affectation: opt.value, affectationLabel: undefined })}
                     style={[
-                      styles.vehicleChipText,
-                      { color: active ? colors.primaryForeground : colors.mutedForeground },
+                      styles.vehicleChip,
+                      {
+                        backgroundColor: active ? colors.primary : colors.muted,
+                        borderRadius: colors.radius / 1.5,
+                      },
                     ]}
                   >
-                    {VEHICLE_LABELS[k]}
-                  </Text>
-                </Pressable>
-              );
-            })}
+                    <Text
+                      style={[
+                        styles.vehicleChipText,
+                        { color: active ? colors.primaryForeground : colors.mutedForeground },
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-        ) : null}
-      </View>
-    </Pressable>
+        </View>
+      ) : null}
+
+      {/* Vehicle kind chips (always visible when relevant) */}
+      {vehicleOptions.length > 1 ? (
+        <View style={[styles.vehicleChipRow, { paddingHorizontal: 12, paddingBottom: 10 }]}>
+          {vehicleOptions.map((k) => {
+            const active = vehicleKind === k;
+            return (
+              <Pressable
+                key={k}
+                onPress={() => onVehicleKindChange(k)}
+                style={[
+                  styles.vehicleChip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.muted,
+                    borderRadius: colors.radius / 1.5,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.vehicleChipText,
+                    { color: active ? colors.primaryForeground : colors.mutedForeground },
+                  ]}
+                >
+                  {VEHICLE_LABELS[k]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -875,10 +1051,55 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   parsedCard: {
+    overflow: "hidden",
+  },
+  parsedCardTop: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
     padding: 12,
+  },
+  editToggleBtn: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  editPanel: {
+    borderTopWidth: 1,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 14,
+    gap: 10,
+  },
+  editSectionLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  editRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  editTwoCol: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  editLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    minWidth: 38,
+  },
+  editInput: {
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
   },
   checkbox: {
     width: 22,
