@@ -51,23 +51,32 @@ function detectAffectation(value: string): {
   return { type: "normal", label: v };
 }
 
+function fixYear(yyyy: number, mm: string, dd: string): string {
+  const currentYear = new Date().getFullYear();
+  const y = (yyyy < currentYear - 1 || yyyy > currentYear + 2) ? currentYear : yyyy;
+  return `${y}-${mm}-${dd}`;
+}
+
 function normalizeIsoDate(value: string): string | null {
   const t = value.trim();
   if (!t) return null;
   const iso = ISO_DATE_RE.exec(t);
   if (iso) {
-    return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    return fixYear(Number(iso[1]), iso[2], iso[3]);
   }
   const pt = PT_DATE_RE.exec(t);
   if (pt) {
-    return displayDateToIso(`${pt[1]}-${pt[2]}-${pt[3]}`);
+    const raw = displayDateToIso(`${pt[1]}-${pt[2]}-${pt[3]}`);
+    if (!raw) return null;
+    const [y, m, d] = raw.split("-");
+    return fixYear(Number(y), m, d);
   }
   const native = new Date(t);
   if (!Number.isNaN(native.getTime())) {
     const yyyy = native.getFullYear();
     const mm = String(native.getMonth() + 1).padStart(2, "0");
     const dd = String(native.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
+    return fixYear(yyyy, mm, dd);
   }
   return null;
 }
