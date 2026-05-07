@@ -37,26 +37,10 @@ import {
   parseShiftImport,
 } from "@/utils/shiftImport";
 
-const SAMPLE_TEXT = `Cola aqui os serviços do portal da Carris.
-
-Aceita 3 formatos:
-
-1) JSON (ex: copiado das ferramentas do browser)
-[
-  {"date":"2026-05-01","code":"0115","vehicle":"15E/06","tipo":"Normal",
-   "inicio":{"local":"Martim Moniz","hora":"15:15"},
-   "fim":{"local":"Calvário","hora":"17:30"}}
-]
-
-2) Tabela (separada por tab, | ou ponto-e-vírgula)
-Data | Serviço | Viatura | Tipo | Hora Início | Local Início | Hora Fim | Local Fim
-2026-05-01 | 0115 | 15E/06 | Normal | 15:15 | Martim Moniz | 17:30 | Calvário
-
-3) Texto livre (cada serviço separado por linha em branco)
-2026-05-01
+const SAMPLE_TEXT = `Exemplo:
 Serviço 0115 - 15E/06 - Normal
-Martim Moniz 15:15
-Calvário 17:30
+Sto. Amaro (Est.) 10:00
+Sto. Amaro (Est.) 13:00
 `;
 
 function getApiBase(): string {
@@ -128,11 +112,16 @@ export default function ShiftImportScreen() {
   const [resultMsg, setResultMsg] = useState<string | null>(null);
   const [ocrLoading, setOcrLoading] = useState<boolean>(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
-  const [ocrNeedsDate, setOcrNeedsDate] = useState<boolean>(false);
-  const [overrideDateDisplay, setOverrideDateDisplay] = useState<string>("");
-  const [overrideDateIso, setOverrideDateIso] = useState<string | null>(null);
+  const [overrideDateDisplay, setOverrideDateDisplay] = useState<string>(() => isoToDisplayDate(fallbackDate));
+  const [overrideDateIso, setOverrideDateIso] = useState<string | null>(() => fallbackDate);
 
   const effectiveFallbackDate = overrideDateIso ?? fallbackDate;
+
+  const dateAgeDays = useMemo(() => {
+    if (!overrideDateIso) return 0;
+    const diff = Date.now() - new Date(overrideDateIso + "T00:00:00").getTime();
+    return Math.floor(diff / 86_400_000);
+  }, [overrideDateIso]);
 
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? Math.max(insets.top, 67) : insets.top;
@@ -172,9 +161,8 @@ export default function ShiftImportScreen() {
     setEdits({});
     setResultMsg(null);
     setOcrError(null);
-    setOcrNeedsDate(false);
-    setOverrideDateDisplay("");
-    setOverrideDateIso(null);
+    setOverrideDateDisplay(isoToDisplayDate(fallbackDate));
+    setOverrideDateIso(fallbackDate);
   };
 
   const handlePickImage = async () => {
@@ -211,18 +199,6 @@ export default function ShiftImportScreen() {
       setText(extractedText);
       setAnalyzed(null);
       setSelectedIds({});
-      const hasDate =
-        /\b\d{4}-\d{2}-\d{2}\b/.test(extractedText) ||
-        /\b\d{2}[-/]\d{2}[-/]\d{4}\b/.test(extractedText);
-      if (!hasDate) {
-        setOcrNeedsDate(true);
-        setOverrideDateDisplay(isoToDisplayDate(fallbackDate));
-        setOverrideDateIso(fallbackDate);
-      } else {
-        setOcrNeedsDate(false);
-        setOverrideDateDisplay("");
-        setOverrideDateIso(null);
-      }
     } catch (e: any) {
       setOcrError(`Erro: ${e?.message ?? "falha desconhecida"}`);
     } finally {
@@ -316,20 +292,57 @@ export default function ShiftImportScreen() {
 
           <View
             style={[
-              styles.infoBanner,
+              styles.dateBanner,
               {
-                backgroundColor: colors.muted,
+                backgroundColor: colors.accent + "18",
+                borderColor: colors.accent,
                 borderRadius: colors.radius,
               },
             ]}
           >
-            <Feather name="info" size={16} color={colors.primary} />
-            <Text
-              style={[styles.infoBannerText, { color: colors.foreground }]}
-            >
-              Seleciona uma imagem do portal para reconhecimento automático, ou
-              cola o texto diretamente (JSON, tabela ou texto livre).
+            <View style={styles.dateBannerTop}>
+              <Feather name="calendar" size={15} color={colors.accent} />
+              <Text style={[styles.dateBannerTitle, { color: colors.foreground }]}>
+                Data dos serviços
+              </Text>
+            </View>
+            <Text style={[styles.dateBannerSub, { color: colors.mutedForeground }]}>
+              Confirma a data antes de importar:
             </Text>
+            <TextInput
+              value={overrideDateDisplay}
+              onChangeText={(v) => {
+                setOverrideDateDisplay(v);
+                const iso = displayDateToIso(v);
+                setOverrideDateIso(iso ?? null);
+              }}
+              placeholder="DD-MM-AAAA"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="numeric"
+              maxLength={10}
+              style={[
+                styles.dateBannerInput,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: !overrideDateIso
+                    ? colors.destructive
+                    : dateAgeDays > 30
+                      ? "#D97706"
+                      : colors.accent,
+                  borderRadius: colors.radius - 4,
+                  color: colors.foreground,
+                },
+              ]}
+            />
+            {!overrideDateIso ? (
+              <Text style={[styles.dateBannerWarn, { color: colors.destructive }]}>
+                Data inválida — usa o formato DD-MM-AAAA
+              </Text>
+            ) : dateAgeDays > 30 ? (
+              <Text style={[styles.dateBannerWarn, { color: "#D97706" }]}>
+                Atenção: data há mais de {dateAgeDays} dias
+              </Text>
+            ) : null}
           </View>
 
           <Pressable
@@ -381,55 +394,6 @@ export default function ShiftImportScreen() {
             </View>
           ) : null}
 
-          {ocrNeedsDate ? (
-            <View
-              style={[
-                styles.dateBanner,
-                {
-                  backgroundColor: colors.accent + "18",
-                  borderColor: colors.accent,
-                  borderRadius: colors.radius,
-                },
-              ]}
-            >
-              <View style={styles.dateBannerTop}>
-                <Feather name="calendar" size={15} color={colors.accent} />
-                <Text style={[styles.dateBannerTitle, { color: colors.foreground }]}>
-                  Nenhuma data encontrada na imagem
-                </Text>
-              </View>
-              <Text style={[styles.dateBannerSub, { color: colors.mutedForeground }]}>
-                Confirma ou edita a data a aplicar a todos os serviços:
-              </Text>
-              <TextInput
-                value={overrideDateDisplay}
-                onChangeText={(v) => {
-                  setOverrideDateDisplay(v);
-                  const iso = displayDateToIso(v);
-                  if (iso) setOverrideDateIso(iso);
-                }}
-                placeholder="DD-MM-AAAA"
-                placeholderTextColor={colors.mutedForeground}
-                keyboardType="numeric"
-                maxLength={10}
-                style={[
-                  styles.dateBannerInput,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: overrideDateIso ? colors.accent : colors.destructive,
-                    borderRadius: colors.radius - 4,
-                    color: colors.foreground,
-                  },
-                ]}
-              />
-              {!overrideDateIso ? (
-                <Text style={[styles.dateBannerWarn, { color: colors.destructive }]}>
-                  Data inválida — usa o formato DD-MM-AAAA
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
-
           <View style={styles.orRow}>
             <View
               style={[styles.orLine, { backgroundColor: colors.border }]}
@@ -460,14 +424,6 @@ export default function ShiftImportScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
-
-          <Text style={[styles.smallHint, { color: colors.mutedForeground }]}>
-            Se algum serviço não tiver data, é usada{" "}
-            <Text style={{ fontFamily: "Inter_700Bold" }}>
-              {isoToDisplayDate(effectiveFallbackDate)}
-            </Text>{" "}
-            como data padrão.
-          </Text>
 
           <View style={styles.actionRow}>
             <Pressable
