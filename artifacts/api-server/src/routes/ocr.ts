@@ -8,10 +8,7 @@ const client = new OpenAI({
   apiKey: process.env["AI_INTEGRATIONS_OPENAI_API_KEY"],
 });
 
-const SYSTEM_PROMPT = `És um assistente especializado em extrair dados de serviços de tripulantes de transportes públicos portugueses (Carris/Metro/CP/outros operadores).
-
-Vais receber imagens de screenshots de apps ou portais de gestão de serviços.
-
+const SHARED_RULES = `
 === FORMATO 1 — Portal Carris (ecrã "Consultar Serviço") ===
 
   Consultar Serviço: 30/04/2026
@@ -82,13 +79,23 @@ Output correto (uma entrada por etapa, com data da lista ou fallback para hoje; 
 - CODIGO: código do serviço (ex: C514, 0115, Museu, Museu-1). Se não existir, omite.
 - VIATURA: campo "Serviço de Viatura". Remove caracteres especiais iniciais (ex: "/Museu#/Museu" → "Museu"). Se não existir, omite.
 - TIPO: campo "Tipo de Afetação" (ex: Normal, Normal FO, Extra Tipo 1, Extra Tipo 2). "Condução" e "Condução Normal" mapeiam para "Normal". "Normal FO" indica serviço em feriado. Se não existir, usa "Normal".
-- LOCAL_INICIO: nome da paragem de início conforme aparece na imagem.
-- LOCAL_FIM: nome da paragem de fim conforme aparece na imagem.
+- LOCAL_INICIO: nome da paragem de início conforme aparece.
+- LOCAL_FIM: nome da paragem de fim conforme aparece.
 - HH:MM: formato 24h com zero à esquerda (ex: 06:30, 14:00).
 - Quando há múltiplas etapas (1ª Etapa, 2ª Etapa, etc.), cria um bloco separado para cada etapa.
 - Obs: inclui o texto da linha "Obs:" se existir. Se não existir, omite esta linha.
 - Devolve APENAS os dados, sem explicações, sem cabeçalhos, sem texto adicional.
 - Se não encontrares nenhum serviço reconhecível, devolve exatamente: SEM_DADOS`;
+
+const SYSTEM_PROMPT_IMAGE = `És um assistente especializado em extrair dados de serviços de tripulantes de transportes públicos portugueses (Carris/Metro/CP/outros operadores).
+
+Vais receber imagens de screenshots de apps ou portais de gestão de serviços.
+${SHARED_RULES}`;
+
+const SYSTEM_PROMPT_TEXT = `És um assistente especializado em extrair dados de serviços de tripulantes de transportes públicos portugueses (Carris/Metro/CP/outros operadores).
+
+Vais receber texto copiado de apps ou portais de gestão de serviços. O texto pode ser irregular, com espaços, tabulações ou linhas em branco a mais. Normaliza-o e extrai os dados de serviço.
+${SHARED_RULES}`;
 
 router.post("/ocr/shift", async (req, res) => {
   const { image, mimeType } = req.body as {
@@ -105,12 +112,12 @@ router.post("/ocr/shift", async (req, res) => {
 
   try {
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      max_tokens: 1024,
+      model: "gpt-5-mini",
+      max_completion_tokens: 1024,
       messages: [
         {
           role: "system",
-          content: SYSTEM_PROMPT,
+          content: SYSTEM_PROMPT_IMAGE,
         },
         {
           role: "user",
@@ -140,8 +147,46 @@ router.post("/ocr/shift", async (req, res) => {
 
     res.json({ text, found: true });
   } catch (err: any) {
-    req.log.error({ err }, "OCR error");
+    req.log.error({ err }, "OCR image error");
     res.status(500).json({ error: "Erro ao processar imagem" });
+  }
+});
+
+router.post("/ocr/shift/text", async (req, res) => {
+  const { text } = req.body as { text?: string };
+
+  if (!text?.trim()) {
+    res.status(400).json({ error: "Campo 'text' obrigatório" });
+    return;
+  }
+
+  try {
+    const completion = await client.chat.completions.create({
+      model: "gpt-5-mini",
+      max_completion_tokens: 1024,
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT_TEXT,
+        },
+        {
+          role: "user",
+          content: `Extrai todos os serviços/turnos do seguinte texto:\n\n${text}`,
+        },
+      ],
+    });
+
+    const result = completion.choices[0]?.message?.content?.trim() ?? "";
+
+    if (!result || result === "SEM_DADOS") {
+      res.json({ text: "", found: false });
+      return;
+    }
+
+    res.json({ text: result, found: true });
+  } catch (err: any) {
+    req.log.error({ err }, "OCR text error");
+    res.status(500).json({ error: "Erro ao processar texto" });
   }
 });
 

@@ -408,10 +408,26 @@ export default function NewShiftScreen() {
     setOcrExpanded(false);
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!ocrText.trim()) return;
     setOcrError(null);
-    const r = parseShiftImport(ocrText, dateIso || undefined);
+    setOcrLoading(true);
+    let textToParse = ocrText;
+    try {
+      const res = await fetch(`${getApiBase()}/api/ocr/shift/text`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-member-id": user?.id ?? "" },
+        body: JSON.stringify({ text: ocrText }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.found && data.text) textToParse = data.text;
+      }
+    } catch {
+    } finally {
+      setOcrLoading(false);
+    }
+    const r = parseShiftImport(textToParse, dateIso || undefined);
     setOcrResult(r);
     const validIdxSet = new Set(
       r.shifts.map((_, i) => i).filter((i) => isValidParsedShift(r.shifts[i])),
