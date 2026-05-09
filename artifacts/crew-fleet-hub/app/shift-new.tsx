@@ -737,10 +737,13 @@ export default function NewShiftScreen() {
                     </ScrollView>
                   ) : null}
                   {codeTemplateShifts.length > 0 ? (
-                    <View style={{ gap: 5 }}>
-                      <Text style={[styles.smallHint, { color: colors.mutedForeground }]}>
-                        Serviços anteriores — toca para preencher:
-                      </Text>
+                    <View style={{ gap: 6 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Feather name="clock" size={12} color={colors.primary} />
+                        <Text style={[styles.smallHint, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
+                          Serviços anteriores — toca para preencher
+                        </Text>
+                      </View>
                       {codeTemplateShifts.map((s) => {
                         const first = s.stops[0];
                         const last = s.stops[s.stops.length - 1];
@@ -749,32 +752,43 @@ export default function NewShiftScreen() {
                             key={s.id}
                             onPress={() => applyTemplate(s)}
                             style={({ pressed }) => ({
-                              backgroundColor: pressed ? colors.muted : colors.card,
+                              backgroundColor: pressed ? colors.primary + "18" : colors.primary + "0B",
                               borderWidth: 1,
-                              borderColor: colors.border,
+                              borderColor: colors.primary + "40",
+                              borderLeftWidth: 3,
+                              borderLeftColor: colors.primary,
                               borderRadius: colors.radius,
                               padding: 10,
-                              gap: 3,
+                              gap: 4,
+                              flexDirection: "row",
+                              alignItems: "center",
                             })}
                           >
-                            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                              <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
-                                {isoToDisplayDate(s.date)}
-                              </Text>
-                              {s.vehicleCode ? (
-                                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>
-                                  {s.vehicleCode}
+                            <View style={{ flex: 1, gap: 3 }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.primary }}>
+                                  {isoToDisplayDate(s.date)}
+                                </Text>
+                                {s.vehicleCode ? (
+                                  <View style={{ backgroundColor: colors.primary + "20", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                                    <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: colors.primary }}>
+                                      {s.vehicleCode}
+                                    </Text>
+                                  </View>
+                                ) : null}
+                                <View style={{ backgroundColor: colors.primary + "20", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                                  <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.primary }}>
+                                    {affectationDisplay(s.affectation)}
+                                  </Text>
+                                </View>
+                              </View>
+                              {first && last ? (
+                                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.primary + "CC" }} numberOfLines={1}>
+                                  {first.time} {first.location} → {last.time} {last.location}
                                 </Text>
                               ) : null}
                             </View>
-                            {first && last ? (
-                              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }} numberOfLines={1}>
-                                {first.time} {first.location} → {last.time} {last.location}
-                              </Text>
-                            ) : null}
-                            <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.primary + "AA" }}>
-                              {affectationDisplay(s.affectation)}
-                            </Text>
+                            <Feather name="chevron-right" size={16} color={colors.primary + "80"} />
                           </Pressable>
                         );
                       })}
