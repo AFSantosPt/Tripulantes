@@ -6,6 +6,7 @@ import { findMemberById } from "../lib/store";
 import { upsertServiceTemplate } from "./service-templates";
 
 const ABSENCE_TYPES = new Set(["folga", "ferias"]);
+const TEMPLATE_SKIP_TYPES = new Set(["folga", "ferias", "extra1", "extra2"]);
 
 interface ShiftStop { location: string; time: string; }
 
@@ -191,7 +192,7 @@ router.post("/shifts", async (req, res) => {
      body.fleetNumber ?? null,
      body.affectation, body.affectationLabel ?? null, JSON.stringify(body.stops), body.notes ?? null, body.availableForSwap ?? false],
   );
-  if (body.code && !ABSENCE_TYPES.has(body.affectation)) {
+  if (body.code && !TEMPLATE_SKIP_TYPES.has(body.affectation)) {
     upsertServiceTemplate({
       code: body.code,
       startTime: body.stops[0]?.time,
@@ -245,7 +246,7 @@ router.put("/shifts/:id", async (req, res) => {
      body.affectation, body.affectationLabel ?? null, JSON.stringify(body.stops),
      body.notes ?? null, body.availableForSwap ?? false, req.params.id],
   );
-  if (body.code && !ABSENCE_TYPES.has(body.affectation)) {
+  if (body.code && !TEMPLATE_SKIP_TYPES.has(body.affectation)) {
     upsertServiceTemplate({
       code: body.code,
       startTime: body.stops[0]?.time,

@@ -33,8 +33,12 @@ const OCR_SERVICE_LINE_RE =
   /^servi[çc]o\s+([A-Z0-9][\w-]*)\s+-\s+([^\s-][^-]*?)\s+-\s+(.+)$/i;
 const OCR_CODE_ONLY_RE = /^servi[çc]o\s+([A-Z0-9][\w-]*)$/i;
 const OBS_LINE_RE = /^obs(?:erva[çc][aã]o)?[:\s]+(.+)$/i;
-const OCR_VEHICLE_LINE_RE = /^servi[çc]o\s+de\s+viatura[:\s]+(.+)$/i;
-const OCR_LINHA_RE = /^linha[:\s]+([A-Z0-9][A-Z0-9/]*)/i;
+const OCR_VEHICLE_LINE_RE = /^servi[çc]o\s+de\s+viatura[:\s]*(.*)$/i;
+const OCR_LINHA_RE = /^(?:linha|carreira)[:\s]+([A-Za-z0-9][A-Za-zÀ-ÿ0-9/]*)/i;
+const ETAPA_HEADER_RE = /^([A-Z0-9][\w-]*)\s*-\s*\d+[ªa°]\s*etapa\s*$/i;
+const OCR_NSERVICO_RE = /^n[°o.º]?\s*servi[çc]o\s+([A-Z0-9][\w-]*)/i;
+const OCR_CHAPA_RE = /^chapa[:\s]+(\d+)\s*$/i;
+const ETAPA_STAGE_RE = /\b(\d+)[ªa°]\s*etapa\b/i;
 
 function parseHashVehicleService(raw: string): {
   vehicleCode: string;
@@ -72,6 +76,8 @@ function detectAffectation(value: string): {
   }
   if (lower.includes("forma") && lower.includes("o")) return { type: "formacao", label: "Formação" };
   if (lower.includes("condução") || lower.includes("conducao")) return { type: "normal" };
+  if (lower.includes("reserva")) return { type: "extra1", label: "Reserva" };
+  if (lower.includes("ordens")) return { type: "extra1", label: "Ordens" };
   if (lower.includes("normal")) return { type: "normal", label: v };
   return { type: "normal", label: v };
 }
@@ -441,6 +447,7 @@ function tryParseText(
     let ocrCarreira: string | undefined;
     let ocrAffRaw: string | undefined;
     let hashServiceWarning: string | undefined;
+    let ocrChapa: string | undefined;
     for (const line of lines) {
       const obsMatch = OBS_LINE_RE.exec(line);
       if (obsMatch) {
@@ -459,14 +466,34 @@ function tryParseText(
         code = svcCode[1].trim();
         continue;
       }
+      const nServico = OCR_NSERVICO_RE.exec(line);
+      if (nServico) {
+        if (!code) code = nServico[1].trim();
+        continue;
+      }
+      const etapaHeader = ETAPA_HEADER_RE.exec(line);
+      if (etapaHeader) {
+        const baseCode = etapaHeader[1].trim();
+        const stageMatch = ETAPA_STAGE_RE.exec(line);
+        const stage = stageMatch ? stageMatch[1] : "";
+        if (!code) code = stage ? `${baseCode}-${stage}` : baseCode;
+        continue;
+      }
       const linhaMatch = OCR_LINHA_RE.exec(line);
       if (linhaMatch) {
         ocrCarreira = linhaMatch[1].trim().toUpperCase();
+        if (!ocrAffRaw && /^ordens$/i.test(ocrCarreira)) ocrAffRaw = "Ordens";
+        continue;
+      }
+      const chapaMatch = OCR_CHAPA_RE.exec(line);
+      if (chapaMatch) {
+        ocrChapa = chapaMatch[1].trim();
         continue;
       }
       const viaturaMatch = OCR_VEHICLE_LINE_RE.exec(line);
       if (viaturaMatch) {
         const raw = viaturaMatch[1].trim();
+        if (!raw) continue;
         const hashed = parseHashVehicleService(raw);
         if (hashed) {
           ocrVehicle = hashed.vehicleCode;
@@ -477,6 +504,8 @@ function tryParseText(
           } else if (hashed.hasEntryDiff) {
             hashServiceWarning = `⚠️ Diferença na entrada — regista a carreira e chapa`;
           }
+        } else if (/^\d+$/.test(raw)) {
+          ocrChapa = raw;
         } else {
           ocrVehicle = raw;
         }
@@ -505,9 +534,10 @@ function tryParseText(
         endLocation = stripped;
       }
     }
-    const rawChapa = ocrVehicle ?? vehicleCode;
+    const effectiveChapa = ocrChapa ?? vehicleCode;
+    const rawChapa = ocrVehicle ?? (ocrCarreira && effectiveChapa ? effectiveChapa : vehicleCode);
     const resolvedVehicle =
-      ocrCarreira && rawChapa && !rawChapa.startsWith("#")
+      ocrCarreira && rawChapa && !rawChapa.startsWith("#") && !/^ordens$/i.test(ocrCarreira)
         ? `${ocrCarreira}/${rawChapa}`
         : rawChapa;
     const resolvedAff = ocrAffRaw ? detectAffectation(ocrAffRaw) : aff;

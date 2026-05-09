@@ -66,6 +66,53 @@ Output correto (uma entrada por etapa, com data da lista ou fallback para hoje; 
   Sto. Amaro (Est.) 14:00
   Sto. Amaro (Est.) 18:00
 
+=== FORMATO 4 — App Carris (ecrã "Detalhes do Serviço" com Etapas e Chapa separada) ===
+
+  0112 - 1ª Etapa
+  Estrela                    15:19
+  Sto. Amaro (Est.)          21:43
+  Linha: 28E                 Tipo: Condução
+  Serviço de Viatura: 08
+
+  0112 - 1ª Etapa
+  Sto. Amaro (Est.)          21:43
+  Sto. Amaro (Est.)          22:49
+  Linha: Ordens              Tipo: Reserva (Disp.)
+  Serviço de Viatura:
+
+Output correto (quando "Serviço de Viatura" é só um número de chapa, combina com Linha como LINHA/CHAPA; quando Linha=Ordens ou Tipo=Reserva usa esse valor como TIPO; numera etapas sequencialmente):
+  Serviço 0112-1 - 28E/08 - Normal
+  Estrela 15:19
+  Sto. Amaro (Est.) 21:43
+
+  Serviço 0112-2 - Ordens - Reserva
+  Sto. Amaro (Est.) 21:43
+  Sto. Amaro (Est.) 22:49
+
+=== FORMATO 5 — Texto livre do utilizador ===
+
+  1° servico
+  N° servico 0112
+  Estrela 15:19 (inicio)
+  Sto. Amaro (est.) 21:43 (fim)
+  Carreira: 28E
+  Chapa: 08
+
+  2°servico
+  N° Servico 0112
+  Sto. Amaro (est.) 21:43 (inicio)
+  Sto. Amaro (est.) 22:49 (Fim)
+  Carreira: Ordens
+
+Output correto (N° Serviço = código; Carreira = linha; Chapa = chapa → combina como LINHA/CHAPA; "Carreira: Ordens" → TIPO=Ordens sem VIATURA):
+  Serviço 0112-1 - 28E/08 - Normal
+  Estrela 15:19
+  Sto. Amaro (Est.) 21:43
+
+  Serviço 0112-2 - Ordens - Ordens
+  Sto. Amaro (Est.) 21:43
+  Sto. Amaro (Est.) 22:49
+
 === OUTPUT FORMAT (um bloco por serviço/etapa, separados por linha em branco) ===
 
   YYYY-MM-DD
@@ -76,12 +123,12 @@ Output correto (uma entrada por etapa, com data da lista ou fallback para hoje; 
 
 === REGRAS ===
 - Data: converte DD/MM/YYYY → YYYY-MM-DD. Se a data aparecer truncada (ex: "07/05/..."), usa o ano corrente. Se não houver data em lado nenhum, omite a linha.
-- CODIGO: código do serviço (ex: C514, 0115, Museu, Museu-1). Se não existir, omite.
-- VIATURA: campo "Serviço de Viatura". Remove caracteres especiais iniciais (ex: "/Museu#/Museu" → "Museu"). Se não existir, omite.
-- TIPO: campo "Tipo de Afetação" (ex: Normal, Normal FO, Extra Tipo 1, Extra Tipo 2). "Condução" e "Condução Normal" mapeiam para "Normal". "Normal FO" indica serviço em feriado. Se não existir, usa "Normal".
+- CODIGO: código do serviço (ex: C514, 0115, Museu, 0112-1). Se não existir, omite. Quando há etapas, numera sequencialmente: 0112-1, 0112-2.
+- VIATURA: combina "Linha/Carreira" + "Chapa" quando chapa é só número (ex: "28E" + "08" → "28E/08"). Remove caracteres especiais (ex: "/Museu#/Museu" → "Museu"). Se Linha=Ordens ou sem viatura, usa "Ordens". Se não existir, omite.
+- TIPO: campo "Tipo de Afetação" ou deduzido da Linha. "Condução" e "Condução Normal" → "Normal". "Normal FO" → "Normal FO". "Reserva (Disp.)" ou "Reserva" → "Reserva". "Ordens" (Linha ou Tipo) → "Ordens". Se não existir, usa "Normal".
 - LOCAL_INICIO: nome da paragem de início conforme aparece.
 - LOCAL_FIM: nome da paragem de fim conforme aparece.
-- HH:MM: formato 24h com zero à esquerda (ex: 06:30, 14:00).
+- HH:MM: formato 24h com zero à esquerda (ex: 06:30, 14:00). Remove texto entre parênteses das horas.
 - Quando há múltiplas etapas (1ª Etapa, 2ª Etapa, etc.), cria um bloco separado para cada etapa.
 - Obs: inclui o texto da linha "Obs:" se existir. Se não existir, omite esta linha.
 - Devolve APENAS os dados, sem explicações, sem cabeçalhos, sem texto adicional.
