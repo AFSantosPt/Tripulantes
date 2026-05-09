@@ -28,8 +28,8 @@ const ISO_DATE_RE = /\b(\d{4})-(\d{2})-(\d{2})\b/;
 const PT_DATE_RE = /\b(\d{2})[-/](\d{2})[-/](\d{4})\b/;
 
 const OCR_SERVICE_LINE_RE =
-  /^servi[çc]o\s+([A-Z0-9]+)\s*-\s*([^\s-][^-]*?)\s*-\s*(.+)$/i;
-const OCR_CODE_ONLY_RE = /^servi[çc]o\s+([A-Z0-9]+)$/i;
+  /^servi[çc]o\s+([A-Z0-9][\w-]*)\s+-\s+([^\s-][^-]*?)\s+-\s+(.+)$/i;
+const OCR_CODE_ONLY_RE = /^servi[çc]o\s+([A-Z0-9][\w-]*)$/i;
 const OBS_LINE_RE = /^obs(?:erva[çc][aã]o)?[:\s]+(.+)$/i;
 const OCR_VEHICLE_LINE_RE = /^servi[çc]o\s+de\s+viatura[:\s]+(.+)$/i;
 
@@ -150,8 +150,8 @@ function shiftFromJsonObject(
       "serviceDate",
       "servicedate",
       "dia",
-    ]) || fallbackDate || "";
-  const date = normalizeIsoDate(dateRaw);
+    ]) || "";
+  const date = fallbackDate ? normalizeIsoDate(fallbackDate) : normalizeIsoDate(dateRaw);
   if (!date) {
     warnings.push(`Sem data válida em: ${JSON.stringify(raw).slice(0, 80)}`);
     return null;
@@ -337,7 +337,7 @@ function tryParseTabular(
     const cols = lines[i].split(sep).map((c) => c.trim());
     if (cols.length < 3) continue;
     const dateRaw = dateCol >= 0 ? cols[dateCol] : "";
-    const date = normalizeIsoDate(dateRaw) ?? fallbackDate ?? null;
+    const date = fallbackDate ?? normalizeIsoDate(dateRaw) ?? null;
     if (!date) {
       warnings.push(`Linha ${i + 1}: data inválida (${dateRaw})`);
       continue;
@@ -406,7 +406,7 @@ function tryParseText(
   for (const block of blocks) {
     const dateMatch = ISO_DATE_RE.exec(block) ?? PT_DATE_RE.exec(block);
     const dateRaw = dateMatch ? dateMatch[0] : "";
-    const date = normalizeIsoDate(dateRaw) ?? fallbackDate ?? null;
+    const date = fallbackDate ?? normalizeIsoDate(dateRaw) ?? null;
     if (!date) {
       warnings.push(`Bloco sem data: ${block.slice(0, 50)}...`);
       continue;
