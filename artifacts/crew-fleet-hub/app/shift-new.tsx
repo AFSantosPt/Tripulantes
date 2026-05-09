@@ -40,6 +40,7 @@ import {
   isValidParsedShift,
   parseShiftImport,
 } from "@/utils/shiftImport";
+import { FOLGA_GROUPS, FolgaGroup, getFolgaDaysForYear } from "@/utils/folgaSchedule";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -180,6 +181,38 @@ export default function NewShiftScreen() {
   const [ocrResult, setOcrResult] = useState<ImportResult | null>(null);
   const [splitWarning, setSplitWarning] = useState<{ parts: string[] } | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
+
+  // ── Calendar data (mirrors index.tsx logic) ──────────────────────────────
+  const calMarkedDates = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          shifts
+            .filter((s) => s.affectation !== "normalFO")
+            .map((s) => s.date),
+        ),
+      ),
+    [shifts],
+  );
+
+  const calFeriadoDates = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          shifts.filter((s) => s.affectation === "normalFO").map((s) => s.date),
+        ),
+      ),
+    [shifts],
+  );
+
+  const calFolgaDates = useMemo(() => {
+    const group = user?.folgaGroup;
+    if (!group || !FOLGA_GROUPS.includes(group as FolgaGroup)) return [];
+    return [
+      ...getFolgaDaysForYear(group as FolgaGroup, 2026),
+      ...getFolgaDaysForYear(group as FolgaGroup, 2027),
+    ];
+  }, [user?.folgaGroup]);
 
   // ── Load existing shift for editing ─────────────────────────────────────
   useEffect(() => {
@@ -704,8 +737,9 @@ export default function NewShiftScreen() {
                       setErrors((e) => ({ ...e, date: undefined }));
                       setShowCalendar(false);
                     }}
-                    markedDates={shifts.map((s) => s.date)}
-                    folgaDates={shifts.filter((s) => ABSENCE_TYPES.has(s.affectation)).map((s) => s.date)}
+                    markedDates={calMarkedDates}
+                    folgaDates={calFolgaDates}
+                    feriadoDates={calFeriadoDates}
                     todayIso={todayIso()}
                   />
                 </View>
