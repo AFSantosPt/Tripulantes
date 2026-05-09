@@ -32,6 +32,7 @@ const OCR_SERVICE_LINE_RE =
 const OCR_CODE_ONLY_RE = /^servi[çc]o\s+([A-Z0-9][\w-]*)$/i;
 const OBS_LINE_RE = /^obs(?:erva[çc][aã]o)?[:\s]+(.+)$/i;
 const OCR_VEHICLE_LINE_RE = /^servi[çc]o\s+de\s+viatura[:\s]+(.+)$/i;
+const OCR_LINHA_RE = /^linha[:\s]+([A-Z0-9][A-Z0-9/]*)/i;
 
 function parseHashVehicleService(raw: string): {
   vehicleCode: string;
@@ -435,6 +436,7 @@ function tryParseText(
     let code: string | undefined;
     let notes: string | undefined;
     let ocrVehicle: string | undefined;
+    let ocrCarreira: string | undefined;
     let ocrAffRaw: string | undefined;
     let hashServiceWarning: string | undefined;
     for (const line of lines) {
@@ -453,6 +455,11 @@ function tryParseText(
       const svcCode = OCR_CODE_ONLY_RE.exec(line);
       if (svcCode) {
         code = svcCode[1].trim();
+        continue;
+      }
+      const linhaMatch = OCR_LINHA_RE.exec(line);
+      if (linhaMatch) {
+        ocrCarreira = linhaMatch[1].trim().toUpperCase();
         continue;
       }
       const viaturaMatch = OCR_VEHICLE_LINE_RE.exec(line);
@@ -496,7 +503,11 @@ function tryParseText(
         endLocation = stripped;
       }
     }
-    const resolvedVehicle = ocrVehicle ?? vehicleCode;
+    const rawChapa = ocrVehicle ?? vehicleCode;
+    const resolvedVehicle =
+      ocrCarreira && rawChapa && !rawChapa.startsWith("#")
+        ? `${ocrCarreira}/${rawChapa}`
+        : rawChapa;
     const resolvedAff = ocrAffRaw ? detectAffectation(ocrAffRaw) : aff;
     if (!startLocation) startLocation = "—";
     if (!endLocation) endLocation = startLocation;

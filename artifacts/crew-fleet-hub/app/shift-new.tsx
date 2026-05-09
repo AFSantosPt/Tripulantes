@@ -545,8 +545,8 @@ export default function NewShiftScreen() {
                   </View>
                   <View style={{ flex: 1, gap: 4 }}>
                     <TextField
-                      label="Serviço de Viatura"
-                      placeholder="Ex: #28E/08"
+                      label="Carreira / Chapa"
+                      placeholder="Ex: 28E/08"
                       value={vehicleCode}
                       onChangeText={setVehicleCode}
                       autoCapitalize="characters"
@@ -995,7 +995,7 @@ function DayShiftCard({
         ) : null}
       </View>
       <Text style={[styles.dayCardMeta, { color: colors.mutedForeground }]}>
-        Serviço de Viatura
+        Carreira / Chapa
       </Text>
       <Text style={[styles.dayCardValue, { color: colors.foreground }]}>
         {shift.vehicleCode?.trim() ? shift.vehicleCode : "/"}
