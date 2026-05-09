@@ -169,6 +169,20 @@ export default function NewShiftScreen() {
       .slice(0, 6);
   }, [codeFocused, code, frequentCodes]);
 
+  const codeTemplateShifts = useMemo<ShiftWithCalc[]>(() => {
+    const q = code.trim().toUpperCase();
+    if (!q || q.length < 2) return [];
+    const cutoff = isoAddDays(todayIso(), -30);
+    return shifts
+      .filter(
+        (s) =>
+          s.code?.trim().toUpperCase() === q &&
+          s.id !== editingId &&
+          s.date >= cutoff,
+      )
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [code, shifts, editingId]);
+
   const resetForm = () => {
     setEditingId(null);
     setCode("");
@@ -198,6 +212,19 @@ export default function NewShiftScreen() {
       range: undefined,
       duplicate: undefined,
     }));
+  };
+
+  const applyTemplate = (s: ShiftWithCalc) => {
+    if (codeSuggestHideTimer.current) clearTimeout(codeSuggestHideTimer.current);
+    setCodeFocused(false);
+    if (s.vehicleCode) setVehicleCode(s.vehicleCode);
+    if (s.vehicleKinds?.length) setVehicleKinds(s.vehicleKinds);
+    if (s.fleetNumber) setFleetNumber(s.fleetNumber);
+    setAffectation(s.affectation);
+    const first = s.stops[0];
+    const last = s.stops[s.stops.length - 1];
+    if (first?.location) setStart({ location: first.location, time: first.time });
+    if (last?.location) setEnd({ location: last.location, time: last.time });
   };
 
   const isAbsenceType = ABSENCE_TYPES.has(affectation);
@@ -555,6 +582,91 @@ export default function NewShiftScreen() {
                     ) : null}
                   </View>
                 </View>
+
+                {codeTemplateShifts.length > 0 ? (
+                  <View style={{ gap: 6 }}>
+                    <Text
+                      style={[
+                        styles.smallHint,
+                        { color: colors.mutedForeground },
+                      ]}
+                    >
+                      Serviços anteriores com este código — toca para preencher:
+                    </Text>
+                    {codeTemplateShifts.map((s) => {
+                      const first = s.stops[0];
+                      const last = s.stops[s.stops.length - 1];
+                      return (
+                        <Pressable
+                          key={s.id}
+                          onPress={() => applyTemplate(s)}
+                          style={({ pressed }) => ({
+                            backgroundColor: pressed
+                              ? colors.muted
+                              : colors.card,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: colors.radius,
+                            padding: 10,
+                            gap: 4,
+                          })}
+                        >
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontFamily: "Inter_600SemiBold",
+                                color: colors.foreground,
+                              }}
+                            >
+                              {isoToDisplayDate(s.date)}
+                            </Text>
+                            {s.vehicleCode ? (
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  fontFamily: "Inter_500Medium",
+                                  color: colors.mutedForeground,
+                                }}
+                              >
+                                {s.vehicleCode}
+                              </Text>
+                            ) : null}
+                          </View>
+                          {first && last ? (
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontFamily: "Inter_400Regular",
+                                color: colors.mutedForeground,
+                              }}
+                              numberOfLines={1}
+                            >
+                              {first.time} {first.location}
+                              {" → "}
+                              {last.time} {last.location}
+                            </Text>
+                          ) : null}
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontFamily: "Inter_400Regular",
+                              color: colors.primary + "AA",
+                            }}
+                          >
+                            {affectationDisplay(s.affectation)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
 
                 <View style={{ gap: 6 }}>
                     <Text style={[styles.label, { color: colors.foreground }]}>
