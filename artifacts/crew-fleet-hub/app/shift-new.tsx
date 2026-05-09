@@ -526,7 +526,7 @@ export default function NewShiftScreen() {
                       autoCorrect={false}
                     />
                     <Text style={[styles.smallHint, { color: colors.mutedForeground }]}>
-                      # no início = pode dar diferença
+                      # no início = pode dar diferença (ao fim do anterior ou ao início deste)
                     </Text>
                     {vehicleCode.startsWith("#") ? (
                       <View

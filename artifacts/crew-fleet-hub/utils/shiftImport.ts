@@ -462,12 +462,11 @@ function tryParseText(
         if (hashed) {
           ocrVehicle = hashed.vehicleCode;
           if (hashed.subServices.length > 1) {
+            const [svc1, svc2] = hashed.subServices;
             hashServiceWarning =
-              `⚠️ Serviço dividido detectado: ${hashed.subServices.join(" + ")}` +
-              (hashed.hasEntryDiff ? " (diferença na entrada)" : "");
+              `⚠️ Serviço dividido: ${hashed.subServices.join(" + ")} — pode dar diferença ao fim de ${svc1} ou ao início de ${svc2 ?? svc1}`;
           } else if (hashed.hasEntryDiff) {
-            ocrVehicle = hashed.vehicleCode;
-            hashServiceWarning = `⚠️ Diferença na entrada do serviço ${hashed.vehicleCode}`;
+            hashServiceWarning = `⚠️ Diferença na entrada — regista a carreira e chapa`;
           }
         } else {
           ocrVehicle = raw;

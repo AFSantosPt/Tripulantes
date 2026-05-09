@@ -850,7 +850,7 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
                   flex: 1,
                 }}
               >
-                Pode dar diferença — regista a carreira e chapa (ex: #28E/08)
+                Pode dar diferença (ao fim do serviço anterior ou ao início deste)
               </Text>
             </View>
           ) : null}
