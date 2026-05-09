@@ -43,6 +43,16 @@ import {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+const DATE_ONLY_LINE_RE = /^(\d{4}-\d{2}-\d{2}|\d{2}[-/]\d{2}[-/]\d{4})$/;
+function stripDateLines(text: string): string {
+  return text
+    .split(/\r?\n/)
+    .filter((line) => !DATE_ONLY_LINE_RE.test(line.trim()))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trimEnd();
+}
+
 function getApiBase(): string {
   if (Platform.OS === "web" && typeof window !== "undefined")
     return window.location.origin;
@@ -335,7 +345,7 @@ export default function NewShiftScreen() {
         setOcrError("Não foi possível reconhecer serviços. Tenta com uma imagem mais nítida ou cola o texto.");
         return;
       }
-      setOcrText(extracted.trim());
+      setOcrText(stripDateLines(extracted));
       setOcrResult(null);
       const r = parseShiftImport(extracted.trim(), dateIso || undefined);
       setOcrResult(r);
@@ -559,7 +569,7 @@ export default function NewShiftScreen() {
 
                   <TextInput
                     value={ocrText}
-                    onChangeText={(v) => { setOcrText(v); setOcrResult(null); }}
+                    onChangeText={(v) => { setOcrText(stripDateLines(v)); setOcrResult(null); }}
                     placeholder={"Serviço 0115 - 28E/08 - Normal\nSto. Amaro (Est.) 10:00\nSto. Amaro (Est.) 13:00"}
                     placeholderTextColor={colors.mutedForeground}
                     multiline
@@ -695,7 +705,7 @@ export default function NewShiftScreen() {
                       setShowCalendar(false);
                     }}
                     markedDates={shifts.map((s) => s.date)}
-                    folgaDates={shifts.filter((s) => s.affectation === "folga" || s.affectation === "ferias").map((s) => s.date)}
+                    folgaDates={shifts.filter((s) => ABSENCE_TYPES.has(s.affectation)).map((s) => s.date)}
                     todayIso={todayIso()}
                   />
                 </View>
