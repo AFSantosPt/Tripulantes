@@ -97,7 +97,8 @@ export default function NewShiftScreen() {
     isoToDisplayDate(initialDate),
   );
   const [code, setCode] = useState<string>("");
-  const [vehicleCode, setVehicleCode] = useState<string>("");
+  const [carreira, setCarreira] = useState<string>("");
+  const [chapa, setChapa] = useState<string>("");
   const [vehicleKinds, setVehicleKinds] = useState<string[]>(() =>
     defaultVehicleKinds(user?.categories ?? []),
   );
@@ -129,7 +130,15 @@ export default function NewShiftScreen() {
     setDateIso(existing.date);
     setDateInput(isoToDisplayDate(existing.date));
     setCode(existing.code ?? "");
-    setVehicleCode(existing.vehicleCode ?? "");
+    const vc = existing.vehicleCode ?? "";
+    const slashIdx = vc.lastIndexOf("/");
+    if (slashIdx > 0) {
+      setCarreira(vc.slice(0, slashIdx));
+      setChapa(vc.slice(slashIdx + 1));
+    } else {
+      setCarreira(vc);
+      setChapa("");
+    }
     setVehicleKinds(existing.vehicleKinds ?? []);
     setFleetNumber(existing.fleetNumber ?? "");
     setAffectation(existing.affectation);
@@ -186,7 +195,8 @@ export default function NewShiftScreen() {
   const resetForm = () => {
     setEditingId(null);
     setCode("");
-    setVehicleCode("");
+    setCarreira("");
+    setChapa("");
     setVehicleKinds(defaultVehicleKinds(user?.categories ?? []));
     setFleetNumber("");
     setAffectation("normal");
@@ -217,7 +227,17 @@ export default function NewShiftScreen() {
   const applyTemplate = (s: ShiftWithCalc) => {
     if (codeSuggestHideTimer.current) clearTimeout(codeSuggestHideTimer.current);
     setCodeFocused(false);
-    if (s.vehicleCode) setVehicleCode(s.vehicleCode);
+    if (s.vehicleCode) {
+      const vc = s.vehicleCode;
+      const slashIdx = vc.lastIndexOf("/");
+      if (slashIdx > 0) {
+        setCarreira(vc.slice(0, slashIdx));
+        setChapa(vc.slice(slashIdx + 1));
+      } else {
+        setCarreira(vc);
+        setChapa("");
+      }
+    }
     if (s.vehicleKinds?.length) setVehicleKinds(s.vehicleKinds);
     if (s.fleetNumber) setFleetNumber(s.fleetNumber);
     setAffectation(s.affectation);
@@ -316,7 +336,7 @@ export default function NewShiftScreen() {
       const payload = {
         date: iso!,
         code: isAbsenceType ? undefined : code.trim() || undefined,
-        vehicleCode: isAbsenceType ? undefined : vehicleCode.trim() || undefined,
+        vehicleCode: isAbsenceType ? undefined : ([carreira.trim(), chapa.trim()].filter(Boolean).join("/") || undefined),
         vehicleKinds: isAbsenceType ? [] : vehicleKinds,
         fleetNumber: savedFleetNumber,
         affectation,
@@ -507,7 +527,12 @@ export default function NewShiftScreen() {
                                 .filter((s) => s.code?.trim().toUpperCase() === suggestion.toUpperCase())
                                 .sort((a, b) => b.date.localeCompare(a.date))[0];
                               if (match) {
-                                if (match.vehicleCode) setVehicleCode(match.vehicleCode);
+                                if (match.vehicleCode) {
+                                  const vc = match.vehicleCode;
+                                  const si = vc.lastIndexOf("/");
+                                  if (si > 0) { setCarreira(vc.slice(0, si)); setChapa(vc.slice(si + 1)); }
+                                  else { setCarreira(vc); setChapa(""); }
+                                }
                                 if (match.vehicleKinds?.length) setVehicleKinds(match.vehicleKinds);
                                 const first = match.stops[0];
                                 const last = match.stops[match.stops.length - 1];
@@ -545,17 +570,25 @@ export default function NewShiftScreen() {
                   </View>
                   <View style={{ flex: 1, gap: 4 }}>
                     <TextField
-                      label="Carreira / Chapa"
-                      placeholder="Ex: 28E/08"
-                      value={vehicleCode}
-                      onChangeText={setVehicleCode}
+                      label="Carreira"
+                      placeholder="Ex: 28E"
+                      value={carreira}
+                      onChangeText={setCarreira}
                       autoCapitalize="characters"
                       autoCorrect={false}
                     />
-                    <Text style={[styles.smallHint, { color: colors.mutedForeground }]}>
-                      # no início = pode dar diferença (ao fim do anterior ou ao início deste)
-                    </Text>
-                    {vehicleCode.startsWith("#") ? (
+                  </View>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <TextField
+                      label="Chapa"
+                      placeholder="Ex: 08"
+                      value={chapa}
+                      onChangeText={setChapa}
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      keyboardType="default"
+                    />
+                    {carreira.startsWith("#") ? (
                       <View
                         style={{
                           flexDirection: "row",
