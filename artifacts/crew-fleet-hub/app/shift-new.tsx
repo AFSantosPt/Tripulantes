@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { MonthCalendar } from "@/components/MonthCalendar";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useConfirm } from "@/components/ConfirmModal";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -168,6 +169,7 @@ export default function NewShiftScreen() {
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<ImportResult | null>(null);
   const [splitWarning, setSplitWarning] = useState<{ parts: string[] } | null>(null);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   // ── Load existing shift for editing ─────────────────────────────────────
   useEffect(() => {
@@ -287,7 +289,6 @@ export default function NewShiftScreen() {
   };
 
   const applyParsedShift = (s: ParsedShift) => {
-    if (s.date) { setDateIso(s.date); setDateInput(isoToDisplayDate(s.date)); }
     if (s.code) setCode(s.code);
     if (s.vehicleCode) applyVehicleCode(s.vehicleCode);
     setAffectation(s.affectation);
@@ -613,7 +614,7 @@ export default function NewShiftScreen() {
                           })}
                         >
                           <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.primary }}>
-                            {isoToDisplayDate(s.date)} · {s.code ?? "—"}
+                            {s.code ?? "—"}
                           </Text>
                           <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }} numberOfLines={1}>
                             {s.startTime} {s.startLocation} → {s.endTime} {s.endLocation}
@@ -645,24 +646,60 @@ export default function NewShiftScreen() {
           <View style={styles.form}>
 
             {/* Dia do Serviço */}
-            <View>
+            <View style={{ gap: 4 }}>
               <Text style={[styles.label, { color: colors.foreground }]}>Dia do Serviço</Text>
               <View style={styles.dateRow}>
                 <View style={{ flex: 1 }}>
                   <TextField
                     placeholder="DD-MM-AAAA"
                     value={dateInput}
-                    onChangeText={handleDateChange}
+                    onChangeText={(v) => { handleDateChange(v); setShowCalendar(false); }}
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="numbers-and-punctuation"
                     error={errors.date}
                   />
                 </View>
-                <View style={[styles.dateIconBox, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
-                  <Feather name="calendar" size={18} color={colors.mutedForeground} />
-                </View>
+                <Pressable
+                  onPress={() => setShowCalendar((v) => !v)}
+                  style={({ pressed }) => [
+                    styles.dateIconBox,
+                    {
+                      backgroundColor: showCalendar ? colors.primary : colors.card,
+                      borderColor: showCalendar ? colors.primary : colors.border,
+                      borderRadius: colors.radius,
+                      opacity: pressed ? 0.8 : 1,
+                    },
+                  ]}
+                >
+                  <Feather
+                    name="calendar"
+                    size={18}
+                    color={showCalendar ? "#fff" : colors.mutedForeground}
+                  />
+                </Pressable>
               </View>
+              {showCalendar ? (
+                <View
+                  style={[
+                    styles.calendarBox,
+                    { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius },
+                  ]}
+                >
+                  <MonthCalendar
+                    selectedDate={dateIso}
+                    onSelectDate={(iso) => {
+                      setDateIso(iso);
+                      setDateInput(isoToDisplayDate(iso));
+                      setErrors((e) => ({ ...e, date: undefined }));
+                      setShowCalendar(false);
+                    }}
+                    markedDates={shifts.map((s) => s.date)}
+                    folgaDates={shifts.filter((s) => s.affectation === "folga" || s.affectation === "ferias").map((s) => s.date)}
+                    todayIso={todayIso()}
+                  />
+                </View>
+              ) : null}
             </View>
 
             {/* Tipo de Afetação */}
@@ -1171,6 +1208,7 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   dateRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   dateIconBox: { width: 48, height: 48, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  calendarBox: { borderWidth: 1, overflow: "hidden" },
   row: { flexDirection: "row", gap: 12 },
   // Code suggestions
   suggestRow: { flexDirection: "row", gap: 6, paddingBottom: 2 },

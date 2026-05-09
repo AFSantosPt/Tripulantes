@@ -340,7 +340,7 @@ function tryParseTabular(
     const cols = lines[i].split(sep).map((c) => c.trim());
     if (cols.length < 3) continue;
     const dateRaw = dateCol >= 0 ? cols[dateCol] : "";
-    const date = normalizeIsoDate(dateRaw) ?? fallbackDate ?? null;
+    const date = fallbackDate ?? normalizeIsoDate(dateRaw) ?? null;
     if (!date) {
       warnings.push(`Linha ${i + 1}: data inválida (${dateRaw})`);
       continue;
@@ -409,7 +409,7 @@ function tryParseText(
   for (const block of blocks) {
     const dateMatch = ISO_DATE_RE.exec(block) ?? PT_DATE_RE.exec(block);
     const dateRaw = dateMatch ? dateMatch[0] : "";
-    const date = normalizeIsoDate(dateRaw) ?? fallbackDate ?? null;
+    const date = fallbackDate ?? normalizeIsoDate(dateRaw) ?? null;
     if (!date) {
       warnings.push(`Bloco sem data: ${block.slice(0, 50)}...`);
       continue;
