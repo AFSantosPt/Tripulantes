@@ -31,6 +31,27 @@ const OCR_SERVICE_LINE_RE =
   /^servi[çc]o\s+([A-Z0-9]+)\s*-\s*([^\s-][^-]*?)\s*-\s*(.+)$/i;
 const OCR_CODE_ONLY_RE = /^servi[çc]o\s+([A-Z0-9]+)$/i;
 const OBS_LINE_RE = /^obs(?:erva[çc][aã]o)?[:\s]+(.+)$/i;
+const OCR_VEHICLE_LINE_RE = /^servi[çc]o\s+de\s+viatura[:\s]+(.+)$/i;
+
+function parseHashVehicleService(raw: string): {
+  vehicleCode: string;
+  subServices: string[];
+  hasEntryDiff: boolean;
+} | null {
+  const stripped = raw.replace(/^\/|\/$/g, "").trim();
+  if (!stripped.includes("#")) return null;
+  const hasEntryDiff = stripped.startsWith("#");
+  const parts = stripped
+    .split("#")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (!parts.length) return null;
+  return {
+    vehicleCode: parts[0],
+    subServices: parts,
+    hasEntryDiff,
+  };
+}
 
 function detectAffectation(value: string): {
   type: AffectationType;
@@ -46,6 +67,7 @@ function detectAffectation(value: string): {
     if (/1|i\b|tipo\s*1/i.test(v)) return { type: "extra1", label: v };
     return { type: "extra1", label: v };
   }
+  if (lower.includes("forma") && lower.includes("o")) return { type: "formacao", label: "Formação" };
   if (lower.includes("condução") || lower.includes("conducao")) return { type: "normal" };
   if (lower.includes("normal")) return { type: "normal", label: v };
   return { type: "normal", label: v };
@@ -414,6 +436,7 @@ function tryParseText(
     let notes: string | undefined;
     let ocrVehicle: string | undefined;
     let ocrAffRaw: string | undefined;
+    let hashServiceWarning: string | undefined;
     for (const line of lines) {
       const obsMatch = OBS_LINE_RE.exec(line);
       if (obsMatch) {
@@ -430,6 +453,25 @@ function tryParseText(
       const svcCode = OCR_CODE_ONLY_RE.exec(line);
       if (svcCode) {
         code = svcCode[1].trim();
+        continue;
+      }
+      const viaturaMatch = OCR_VEHICLE_LINE_RE.exec(line);
+      if (viaturaMatch) {
+        const raw = viaturaMatch[1].trim();
+        const hashed = parseHashVehicleService(raw);
+        if (hashed) {
+          ocrVehicle = hashed.vehicleCode;
+          if (hashed.subServices.length > 1) {
+            hashServiceWarning =
+              `⚠️ Serviço dividido detectado: ${hashed.subServices.join(" + ")}` +
+              (hashed.hasEntryDiff ? " (diferença na entrada)" : "");
+          } else if (hashed.hasEntryDiff) {
+            ocrVehicle = hashed.vehicleCode;
+            hashServiceWarning = `⚠️ Diferença na entrada do serviço ${hashed.vehicleCode}`;
+          }
+        } else {
+          ocrVehicle = raw;
+        }
         continue;
       }
       const lineTimes: string[] = line.match(TIME_RE_GLOBAL) ?? [];
@@ -459,6 +501,8 @@ function tryParseText(
     const resolvedAff = ocrAffRaw ? detectAffectation(ocrAffRaw) : aff;
     if (!startLocation) startLocation = "—";
     if (!endLocation) endLocation = startLocation;
+    if (hashServiceWarning) warnings.push(hashServiceWarning);
+    const combinedNotes = [notes, hashServiceWarning].filter(Boolean).join(" | ") || undefined;
     shifts.push({
       date,
       code: code?.trim(),
@@ -469,7 +513,7 @@ function tryParseText(
       startTime,
       endLocation,
       endTime,
-      notes,
+      notes: combinedNotes,
     });
   }
   return shifts;

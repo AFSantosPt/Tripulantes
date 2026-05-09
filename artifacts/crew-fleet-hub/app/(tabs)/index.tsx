@@ -100,6 +100,15 @@ export default function ShiftsScreen() {
 
   const DRIVING_VEHICLE_KINDS = new Set(["eletrico", "autocarro", "ascensor"]);
 
+  const workedDays = useMemo(() => {
+    const dates = new Set(
+      rangeShifts
+        .filter((s) => !ABSENCE_TYPES.has(s.affectation))
+        .map((s) => s.date),
+    );
+    return dates.size;
+  }, [rangeShifts]);
+
   const monthTotals = useMemo(() => {
     return rangeShifts.reduce(
       (acc, s) => {
@@ -352,8 +361,8 @@ export default function ShiftsScreen() {
               { color: colors.primaryForeground, opacity: 0.7 },
             ]}
           >
-            {formatHoursDecimal(monthTotals.total)} h · {rangeShifts.length}{" "}
-            serviço{rangeShifts.length === 1 ? "" : "s"}
+            {formatHoursDecimal(monthTotals.total)} h · {workedDays}{" "}
+            dia{workedDays === 1 ? "" : "s"} trabalhado{workedDays === 1 ? "" : "s"}
           </Text>
           <View style={styles.summaryStats}>
             <View style={styles.summaryStat}>
@@ -373,6 +382,19 @@ export default function ShiftsScreen() {
               >
                 {formatMinutesToTime(monthTotals.driving)}
               </Text>
+              {monthTotals.driving === 0 ? (
+                <Text
+                  style={{
+                    fontSize: 9,
+                    fontFamily: "Inter_400Regular",
+                    color: colors.primaryForeground,
+                    opacity: 0.45,
+                    marginTop: 2,
+                  }}
+                >
+                  requer tipo de veículo
+                </Text>
+              ) : null}
             </View>
             <View
               style={[

@@ -60,6 +60,11 @@ function vehicleOptionsForCategories(
   return ALL_VEHICLE_OPTIONS.filter((o) => kindSet.has(o.value as VehicleKind));
 }
 
+function defaultVehicleKinds(categories: string[]): string[] {
+  const opts = vehicleOptionsForCategories(categories);
+  return opts.length === 1 ? [opts[0].value] : [];
+}
+
 interface DraftStop {
   location: string;
   time: string;
@@ -93,7 +98,9 @@ export default function NewShiftScreen() {
   );
   const [code, setCode] = useState<string>("");
   const [vehicleCode, setVehicleCode] = useState<string>("");
-  const [vehicleKinds, setVehicleKinds] = useState<string[]>([]);
+  const [vehicleKinds, setVehicleKinds] = useState<string[]>(() =>
+    defaultVehicleKinds(user?.categories ?? []),
+  );
   const [fleetNumber, setFleetNumber] = useState<string>("");
   const [affectation, setAffectation] = useState<AffectationType>("normal");
   const [start, setStart] = useState<DraftStop>(EMPTY_STOP);
@@ -166,7 +173,7 @@ export default function NewShiftScreen() {
     setEditingId(null);
     setCode("");
     setVehicleCode("");
-    setVehicleKinds([]);
+    setVehicleKinds(defaultVehicleKinds(user?.categories ?? []));
     setFleetNumber("");
     setAffectation("normal");
     setStart(EMPTY_STOP);
@@ -426,6 +433,7 @@ export default function NewShiftScreen() {
                 options={[
                   { value: "folga", label: "Folga" },
                   { value: "ferias", label: "Férias" },
+                  { value: "formacao", label: "Formação" },
                 ]}
               />
             </View>

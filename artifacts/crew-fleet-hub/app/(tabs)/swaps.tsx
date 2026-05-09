@@ -679,13 +679,12 @@ export default function SwapsScreen() {
   const availableDayGroups = useMemo(() => {
     if (!user) return [];
 
-    const myWorkDates = new Set(
+    const mySwapDates = new Set(
       allShifts
         .filter(
           (s) =>
             s.crewMemberId === user.id &&
-            s.stops != null &&
-            s.stops.length >= 2,
+            s.availableForSwap === true,
         )
         .map((s) => s.date),
     );
@@ -703,7 +702,7 @@ export default function SwapsScreen() {
       if (!s.availableForSwap) return false;
       if (s.date <= today) return false;
       if (s.crewMemberId === user.id) return false;
-      if (!myWorkDates.has(s.date)) return false;
+      if (!mySwapDates.has(s.date)) return false;
       const offerer = members.find((m) => m.id === s.crewMemberId);
       if (!offerer) return false;
       if (!categoriesCompatible(user.categories ?? [], offerer.categories ?? []))
@@ -818,7 +817,7 @@ export default function SwapsScreen() {
           Trocas
         </Text>
         <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
-          Só aparecem trocas em dias em que ambos têm serviço. Entradas expiram automaticamente após o dia do serviço.
+          Só aparecem trocas em dias em que ambos marcaram "Disponível para troca". Entradas expiram automaticamente após o dia do serviço.
         </Text>
 
         <SectionHeader
