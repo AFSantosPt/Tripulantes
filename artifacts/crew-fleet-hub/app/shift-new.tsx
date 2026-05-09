@@ -411,7 +411,8 @@ export default function NewShiftScreen() {
   const handleAnalyze = () => {
     if (!ocrText.trim()) return;
     setOcrError(null);
-    const r = parseShiftImport(ocrText, dateIso || undefined);
+    const today = new Date().toISOString().slice(0, 10);
+    const r = parseShiftImport(ocrText, dateIso || today);
     setOcrResult(r);
     const validIdxSet = new Set(
       r.shifts.map((_, i) => i).filter((i) => isValidParsedShift(r.shifts[i])),
@@ -488,7 +489,8 @@ export default function NewShiftScreen() {
       }
       setOcrText(stripDateLines(extracted));
       setOcrResult(null);
-      const r = parseShiftImport(extracted.trim(), dateIso || undefined);
+      const today = new Date().toISOString().slice(0, 10);
+      const r = parseShiftImport(extracted.trim(), dateIso || today);
       setOcrResult(r);
       const validIdxSet = new Set(
         r.shifts.map((_, i) => i).filter((i) => isValidParsedShift(r.shifts[i])),

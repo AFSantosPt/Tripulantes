@@ -158,35 +158,32 @@ router.post("/ocr/shift", async (req, res) => {
   const mime = (mimeType ?? "image/jpeg").replace(/[^a-z/]/g, "");
 
   try {
-    const completion = await client.chat.completions.create({
-      model: "gpt-5",
-      max_completion_tokens: 1024,
-      messages: [
-        {
-          role: "system",
-          content: SYSTEM_PROMPT_IMAGE,
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${mime};base64,${image}`,
-                detail: "high",
-              },
-            },
-            {
-              type: "text",
-              text: "Extrai todos os serviços/turnos desta imagem seguindo o formato indicado.",
-            },
-          ],
-        },
-      ],
-    });
+    const callOCR = async (model: string) =>
+      client.chat.completions.create({
+        model,
+        max_tokens: 1024,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT_IMAGE },
+          {
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url: `data:${mime};base64,${image}`, detail: "high" } },
+              { type: "text", text: "Extrai todos os serviços/turnos desta imagem seguindo o formato indicado." },
+            ],
+          },
+        ],
+      });
 
-    const text = completion.choices[0]?.message?.content?.trim() ?? "";
+    const completion = await callOCR("gpt-4o");
+    let text = completion.choices[0]?.message?.content?.trim() ?? "";
     req.log.info({ modelUsed: completion.model, textPreview: text.slice(0, 120) }, "OCR image result");
+
+    if (!text || text === "SEM_DADOS") {
+      req.log.info("OCR returned SEM_DADOS, retrying with gpt-4o-mini");
+      const retry = await callOCR("gpt-4o-mini");
+      text = retry.choices[0]?.message?.content?.trim() ?? "";
+      req.log.info({ textPreview: text.slice(0, 120) }, "OCR retry result");
+    }
 
     if (!text || text === "SEM_DADOS") {
       res.json({ text: "", found: false });
