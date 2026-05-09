@@ -822,14 +822,38 @@ function ServiceCard({ shift, today }: { shift: ShiftWithCalc; today: string }) 
       </View>
 
       {!isAbsence && vehicleLabel ? (
-        <View style={styles.vehicleRow}>
-          <Feather name="truck" size={13} color={colors.mutedForeground} />
-          <Text
-            style={[styles.vehicleText, { color: colors.mutedForeground }]}
-          >
-            Serviço de Viatura:{" "}
-            <Text style={{ color: colors.foreground }}>{vehicleLabel}</Text>
-          </Text>
+        <View style={{ gap: 4 }}>
+          <View style={styles.vehicleRow}>
+            <Feather name="truck" size={13} color={colors.mutedForeground} />
+            <Text
+              style={[styles.vehicleText, { color: colors.mutedForeground }]}
+            >
+              Serviço de Viatura:{" "}
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{vehicleLabel}</Text>
+            </Text>
+          </View>
+          {vehicleLabel.startsWith("#") ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                paddingHorizontal: 4,
+              }}
+            >
+              <Feather name="alert-triangle" size={11} color={colors.accent} />
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontFamily: "Inter_500Medium",
+                  color: colors.accent,
+                  flex: 1,
+                }}
+              >
+                Pode dar diferença — regista a carreira e chapa (ex: #28E/08)
+              </Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
 

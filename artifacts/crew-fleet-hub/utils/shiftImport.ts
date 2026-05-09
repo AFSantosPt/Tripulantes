@@ -47,7 +47,7 @@ function parseHashVehicleService(raw: string): {
     .filter(Boolean);
   if (!parts.length) return null;
   return {
-    vehicleCode: parts[0],
+    vehicleCode: hasEntryDiff ? `#${parts[0]}` : parts[0],
     subServices: parts,
     hasEntryDiff,
   };

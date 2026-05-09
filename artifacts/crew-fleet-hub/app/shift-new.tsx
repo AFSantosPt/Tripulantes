@@ -516,15 +516,43 @@ export default function NewShiftScreen() {
                       </ScrollView>
                     ) : null}
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, gap: 4 }}>
                     <TextField
                       label="Serviço de Viatura"
-                      placeholder="Ex: 15E/06"
+                      placeholder="Ex: #28E/08"
                       value={vehicleCode}
                       onChangeText={setVehicleCode}
                       autoCapitalize="characters"
                       autoCorrect={false}
                     />
+                    <Text style={[styles.smallHint, { color: colors.mutedForeground }]}>
+                      # no início = pode dar diferença
+                    </Text>
+                    {vehicleCode.startsWith("#") ? (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 5,
+                          backgroundColor: colors.accent + "18",
+                          borderRadius: colors.radius - 4,
+                          paddingHorizontal: 8,
+                          paddingVertical: 5,
+                        }}
+                      >
+                        <Feather name="alert-triangle" size={12} color={colors.accent} />
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontFamily: "Inter_500Medium",
+                            color: colors.accent,
+                            flex: 1,
+                          }}
+                        >
+                          Pode dar diferença
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
 
