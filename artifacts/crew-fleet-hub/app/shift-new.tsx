@@ -163,6 +163,7 @@ export default function NewShiftScreen() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<ImportResult | null>(null);
+  const [splitWarning, setSplitWarning] = useState<{ parts: string[] } | null>(null);
 
   // ── Load existing shift for editing ─────────────────────────────────────
   useEffect(() => {
@@ -289,6 +290,7 @@ export default function NewShiftScreen() {
     if (s.startLocation) setStart({ location: s.startLocation, time: s.startTime });
     if (s.endLocation) setEnd({ location: s.endLocation, time: s.endTime });
     if (s.notes) setNotes(s.notes);
+    setSplitWarning(s.isSplit && s.splitParts?.length ? { parts: s.splitParts } : null);
     setOcrResult(null);
     setOcrText("");
     setOcrExpanded(false);
@@ -803,13 +805,39 @@ export default function NewShiftScreen() {
                 </Text>
 
                 {/* Carreira + Chapa */}
+                {splitWarning ? (
+                  <View style={[styles.splitBanner, { backgroundColor: "#FEF3C7", borderColor: "#D97706", borderRadius: colors.radius }]}>
+                    <Feather name="alert-triangle" size={16} color="#D97706" />
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={[styles.splitBannerTitle, { color: "#92400E" }]}>
+                        Serviço repartido detectado
+                      </Text>
+                      <Text style={[styles.splitBannerBody, { color: "#78350F" }]}>
+                        Este serviço tem sub-serviços diferentes:{" "}
+                        <Text style={{ fontFamily: "Inter_700Bold" }}>
+                          {splitWarning.parts.join(" + ")}
+                        </Text>
+                        {"\n"}Para registar correctamente, envia o OCR com cada serviço separado — um de cada vez.
+                      </Text>
+                      <Pressable
+                        onPress={() => setSplitWarning(null)}
+                        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, alignSelf: "flex-start" })}
+                      >
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#92400E", textDecorationLine: "underline" }}>
+                          Ignorar e continuar na mesma
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : null}
+
                 <View style={styles.row}>
                   <View style={{ flex: 1 }}>
                     <TextField
                       label="Carreira"
                       placeholder="Ex: 28E"
-                      value={carreira}
-                      onChangeText={setCarreira}
+                      value={carreira.replace(/^#/, "")}
+                      onChangeText={(v) => { setCarreira(v); setSplitWarning(null); }}
                       autoCapitalize="characters"
                       autoCorrect={false}
                     />
@@ -819,14 +847,14 @@ export default function NewShiftScreen() {
                       label="Chapa"
                       placeholder="Ex: 08"
                       value={chapa}
-                      onChangeText={setChapa}
+                      onChangeText={(v) => { setChapa(v); setSplitWarning(null); }}
                       autoCapitalize="characters"
                       autoCorrect={false}
                     />
-                    {carreira.startsWith("#") ? (
+                    {!splitWarning && carreira.startsWith("#") ? (
                       <View style={[styles.warnBanner, { backgroundColor: colors.accent + "18", borderRadius: colors.radius - 4 }]}>
                         <Feather name="alert-triangle" size={12} color={colors.accent} />
-                        <Text style={[styles.warnBannerText, { color: colors.accent }]}>Pode dar diferença</Text>
+                        <Text style={[styles.warnBannerText, { color: colors.accent }]}>Pode dar diferença na entrada</Text>
                       </View>
                     ) : null}
                   </View>
@@ -1137,6 +1165,10 @@ const styles = StyleSheet.create({
   // Warning banner
   warnBanner: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 5, marginTop: 4 },
   warnBannerText: { fontSize: 12, fontFamily: "Inter_500Medium", flex: 1 },
+  // Split service banner
+  splitBanner: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderWidth: 1.5 },
+  splitBannerTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  splitBannerBody: { fontSize: 13, fontFamily: "Inter_500Medium", lineHeight: 19 },
   // Error banner
   errorBanner: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderWidth: 1 },
   errorBannerText: { flex: 1, fontSize: 13, fontFamily: "Inter_600SemiBold", lineHeight: 18 },

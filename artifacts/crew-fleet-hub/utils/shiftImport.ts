@@ -11,6 +11,8 @@ export interface ParsedShift {
   endLocation: string;
   endTime: string;
   notes?: string;
+  isSplit?: boolean;
+  splitParts?: string[];
 }
 
 export type ImportFormat = "json" | "tabular" | "text" | "unknown";
@@ -511,6 +513,15 @@ function tryParseText(
     const resolvedAff = ocrAffRaw ? detectAffectation(ocrAffRaw) : aff;
     if (!startLocation) startLocation = "—";
     if (!endLocation) endLocation = startLocation;
+    const isSplit = hashServiceWarning?.includes("Serviço dividido") ?? false;
+    const splitParts = isSplit
+      ? hashServiceWarning!
+          .replace(/^⚠️ Serviço dividido:\s*/i, "")
+          .split(/\s*—\s*/)[0]
+          ?.split("+")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined;
     if (hashServiceWarning) warnings.push(hashServiceWarning);
     const combinedNotes = [notes, hashServiceWarning].filter(Boolean).join(" | ") || undefined;
     shifts.push({
@@ -524,6 +535,8 @@ function tryParseText(
       endLocation,
       endTime,
       notes: combinedNotes,
+      isSplit,
+      splitParts,
     });
   }
   return shifts;
