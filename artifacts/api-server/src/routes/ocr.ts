@@ -159,7 +159,7 @@ router.post("/ocr/shift", async (req, res) => {
 
   try {
     const completion = await client.chat.completions.create({
-      model: "gpt-5-mini",
+      model: "gpt-5",
       max_completion_tokens: 1024,
       messages: [
         {
@@ -186,6 +186,7 @@ router.post("/ocr/shift", async (req, res) => {
     });
 
     const text = completion.choices[0]?.message?.content?.trim() ?? "";
+    req.log.info({ modelUsed: completion.model, textPreview: text.slice(0, 120) }, "OCR image result");
 
     if (!text || text === "SEM_DADOS") {
       res.json({ text: "", found: false });
@@ -224,6 +225,7 @@ router.post("/ocr/shift/text", async (req, res) => {
     });
 
     const result = completion.choices[0]?.message?.content?.trim() ?? "";
+    req.log.info({ modelUsed: completion.model, textPreview: result.slice(0, 120) }, "OCR text result");
 
     if (!result || result === "SEM_DADOS") {
       res.json({ text: "", found: false });
