@@ -522,33 +522,6 @@ export default function ShiftsScreen() {
             <Pressable
               onPress={() =>
                 router.push({
-                  pathname: "/shift-import",
-                  params: { date: selectedDate },
-                })
-              }
-              style={({ pressed }) => [
-                styles.importBtn,
-                {
-                  backgroundColor: colors.muted,
-                  borderRadius: colors.radius,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              <Feather
-                name="download"
-                size={16}
-                color={colors.foreground}
-              />
-              <Text
-                style={[styles.addBtnLabel, { color: colors.foreground }]}
-              >
-                Importar
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() =>
-                router.push({
                   pathname: "/shift-new",
                   params: { date: selectedDate },
                 })
@@ -1144,13 +1117,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  importBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
   },
   addBtn: {
     flexDirection: "row",
