@@ -3,6 +3,7 @@ import pool from "../lib/db";
 import { newId } from "../lib/id";
 import { broadcast } from "../lib/sse";
 import { findMemberById } from "../lib/store";
+import { upsertServiceTemplate } from "./service-templates";
 
 const ABSENCE_TYPES = new Set(["folga", "ferias"]);
 
@@ -190,6 +191,18 @@ router.post("/shifts", async (req, res) => {
      body.fleetNumber ?? null,
      body.affectation, body.affectationLabel ?? null, JSON.stringify(body.stops), body.notes ?? null, body.availableForSwap ?? false],
   );
+  if (body.code && !ABSENCE_TYPES.has(body.affectation)) {
+    upsertServiceTemplate({
+      code: body.code,
+      startTime: body.stops[0]?.time,
+      startLocation: body.stops[0]?.location,
+      endTime: body.stops[body.stops.length - 1]?.time,
+      endLocation: body.stops[body.stops.length - 1]?.location,
+      vehicleCode: body.vehicleCode,
+      vehicleKinds: body.vehicleKinds,
+      affectation: body.affectation,
+    }).catch(() => {});
+  }
   broadcast("shifts");
   res.status(201).json({ shift: rowToShift(r.rows[0]) });
 });
@@ -232,6 +245,18 @@ router.put("/shifts/:id", async (req, res) => {
      body.affectation, body.affectationLabel ?? null, JSON.stringify(body.stops),
      body.notes ?? null, body.availableForSwap ?? false, req.params.id],
   );
+  if (body.code && !ABSENCE_TYPES.has(body.affectation)) {
+    upsertServiceTemplate({
+      code: body.code,
+      startTime: body.stops[0]?.time,
+      startLocation: body.stops[0]?.location,
+      endTime: body.stops[body.stops.length - 1]?.time,
+      endLocation: body.stops[body.stops.length - 1]?.location,
+      vehicleCode: body.vehicleCode,
+      vehicleKinds: body.vehicleKinds,
+      affectation: body.affectation,
+    }).catch(() => {});
+  }
   broadcast("shifts");
   res.json({ shift: rowToShift(r.rows[0]) });
 });

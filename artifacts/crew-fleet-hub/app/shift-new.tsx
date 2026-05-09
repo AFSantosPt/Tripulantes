@@ -42,6 +42,21 @@ import {
 } from "@/utils/shiftImport";
 import { FOLGA_GROUPS, FolgaGroup, getFolgaDaysForYear } from "@/utils/folgaSchedule";
 
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface ServiceTemplate {
+  id: number;
+  code: string;
+  startTime?: string;
+  startLocation?: string;
+  endTime?: string;
+  endLocation?: string;
+  vehicleCode?: string;
+  vehicleKinds?: string[];
+  affectation: string;
+  usageCount: number;
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const DATE_ONLY_LINE_RE = /^(\d{4}-\d{2}-\d{2}|\d{2}[-/]\d{2}[-/]\d{4})$/;
@@ -181,6 +196,10 @@ export default function NewShiftScreen() {
   const [ocrResult, setOcrResult] = useState<ImportResult | null>(null);
   const [splitWarning, setSplitWarning] = useState<{ parts: string[] } | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [dbTemplates, setDbTemplates] = useState<ServiceTemplate[]>([]);
+  const [selectedOcrIdx, setSelectedOcrIdx] = useState<Set<number>>(new Set());
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const dbFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Calendar data (mirrors index.tsx logic) ──────────────────────────────
   const calMarkedDates = useMemo(
@@ -261,11 +280,21 @@ export default function NewShiftScreen() {
   const codeSuggestions = useMemo<string[]>(() => {
     if (!codeFocused) return [];
     const q = code.trim().toUpperCase();
-    if (!q) return frequentCodes.slice(0, 6);
-    return frequentCodes
+    const dbCodes = dbTemplates.map((t) => t.code);
+    const allCodes = Array.from(new Set([...frequentCodes, ...dbCodes]));
+    if (!q) return allCodes.slice(0, 8);
+    return allCodes
       .filter((c) => c.toUpperCase().startsWith(q) && c.toUpperCase() !== q)
-      .slice(0, 6);
-  }, [codeFocused, code, frequentCodes]);
+      .slice(0, 8);
+  }, [codeFocused, code, frequentCodes, dbTemplates]);
+
+  const validOcrShifts = useMemo(
+    () =>
+      (ocrResult?.shifts ?? [])
+        .map((s, i) => ({ s, i }))
+        .filter(({ s }) => isValidParsedShift(s)),
+    [ocrResult],
+  );
 
   const codeTemplateShifts = useMemo<ShiftWithCalc[]>(() => {
     const q = code.trim().toUpperCase();
@@ -331,6 +360,41 @@ export default function NewShiftScreen() {
     if (last?.location) setEnd({ location: last.location, time: last.time });
   };
 
+  // ── DB template fetch (debounced) ────────────────────────────────────────
+  useEffect(() => {
+    if (!codeFocused) {
+      setDbTemplates([]);
+      return;
+    }
+    if (dbFetchTimer.current) clearTimeout(dbFetchTimer.current);
+    dbFetchTimer.current = setTimeout(async () => {
+      try {
+        const q = code.trim();
+        const qs = q ? `?q=${encodeURIComponent(q)}` : "";
+        const res = await fetch(`${getApiBase()}/api/service-templates${qs}`, {
+          headers: { "x-member-id": user?.id ?? "" },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setDbTemplates(data.templates ?? []);
+        }
+      } catch {}
+    }, 300);
+    return () => {
+      if (dbFetchTimer.current) clearTimeout(dbFetchTimer.current);
+    };
+  }, [code, codeFocused, user?.id]);
+
+  const applyDbTemplate = (t: ServiceTemplate) => {
+    if (codeSuggestHideTimer.current) clearTimeout(codeSuggestHideTimer.current);
+    setCodeFocused(false);
+    setCode(t.code);
+    if (t.vehicleCode) applyVehicleCode(t.vehicleCode);
+    if (t.vehicleKinds?.length) setVehicleKinds(t.vehicleKinds);
+    if (t.startLocation) setStart({ location: t.startLocation, time: t.startTime ?? "" });
+    if (t.endLocation) setEnd({ location: t.endLocation, time: t.endTime ?? "" });
+  };
+
   const applyParsedShift = (s: ParsedShift) => {
     if (s.code) setCode(s.code);
     if (s.vehicleCode) applyVehicleCode(s.vehicleCode);
@@ -349,8 +413,52 @@ export default function NewShiftScreen() {
     setOcrError(null);
     const r = parseShiftImport(ocrText, dateIso || undefined);
     setOcrResult(r);
+    const validIdxSet = new Set(
+      r.shifts.map((_, i) => i).filter((i) => isValidParsedShift(r.shifts[i])),
+    );
+    setSelectedOcrIdx(validIdxSet);
     if (r.shifts.length === 1 && isValidParsedShift(r.shifts[0])) {
       applyParsedShift(r.shifts[0]);
+    }
+  };
+
+  const handleBulkSaveParsed = async () => {
+    if (!ocrResult) return;
+    const toSave = validOcrShifts.filter(({ i }) => selectedOcrIdx.has(i));
+    if (!toSave.length) return;
+    setBulkSaving(true);
+    let saved = 0;
+    const failed: string[] = [];
+    for (const { s } of toSave) {
+      const stops: ShiftStop[] = [];
+      if (s.startLocation && s.startTime) stops.push({ location: s.startLocation, time: s.startTime });
+      if (s.endLocation && s.endTime) stops.push({ location: s.endLocation, time: s.endTime });
+      const result = await addShift({
+        date: dateIso,
+        code: s.code,
+        vehicleCode: s.vehicleCode,
+        vehicleKinds: undefined,
+        fleetNumber: undefined,
+        affectation: s.affectation,
+        stops,
+        notes: undefined,
+        availableForSwap: false,
+      });
+      if (result.ok) saved++;
+      else failed.push(result.reason ?? "Erro desconhecido");
+    }
+    setBulkSaving(false);
+    if (failed.length === 0) {
+      setOcrResult(null);
+      setOcrText("");
+      setSelectedOcrIdx(new Set());
+      setOcrExpanded(false);
+      alert("Guardado", `${saved} serviço(s) guardado(s) com sucesso.`);
+    } else {
+      alert(
+        "Parcialmente guardado",
+        `${saved} guardado(s). ${failed.length} falhou: ${failed[0]}`,
+      );
     }
   };
 
@@ -382,6 +490,10 @@ export default function NewShiftScreen() {
       setOcrResult(null);
       const r = parseShiftImport(extracted.trim(), dateIso || undefined);
       setOcrResult(r);
+      const validIdxSet = new Set(
+        r.shifts.map((_, i) => i).filter((i) => isValidParsedShift(r.shifts[i])),
+      );
+      setSelectedOcrIdx(validIdxSet);
       if (r.shifts.length === 1 && isValidParsedShift(r.shifts[0])) {
         applyParsedShift(r.shifts[0]);
       }
@@ -638,42 +750,95 @@ export default function NewShiftScreen() {
                     </View>
                   </View>
 
-                  {ocrResult && ocrResult.shifts.length > 1 ? (
-                    <View style={{ gap: 6 }}>
-                      <Text style={[styles.smallHint, { color: colors.mutedForeground }]}>
-                        {ocrResult.shifts.length} serviços detectados — toca para preencher:
-                      </Text>
-                      {ocrResult.shifts.filter(isValidParsedShift).map((s, idx) => (
-                        <Pressable
-                          key={idx}
-                          onPress={() => applyParsedShift(s)}
-                          style={({ pressed }) => ({
-                            backgroundColor: pressed ? colors.muted : colors.background,
-                            borderWidth: 1,
-                            borderColor: colors.primary + "55",
-                            borderRadius: colors.radius,
-                            padding: 10,
-                            gap: 2,
-                          })}
-                        >
-                          <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.primary }}>
-                            {s.code ?? "—"}
-                          </Text>
-                          <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }} numberOfLines={1}>
-                            {s.startTime} {s.startLocation} → {s.endTime} {s.endLocation}
-                          </Text>
-                          {s.vehicleCode ? (
-                            <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.foreground }}>
-                              {s.vehicleCode}
-                            </Text>
-                          ) : null}
-                        </Pressable>
-                      ))}
-                      {ocrResult.warnings.length > 0 ? (
+                  {validOcrShifts.length > 0 ? (
+                    <View style={{ gap: 8 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                         <Text style={[styles.smallHint, { color: colors.mutedForeground }]}>
-                          ⚠ {ocrResult.warnings[0]}
+                          {validOcrShifts.length} serviço(s) detectado(s):
+                        </Text>
+                        {validOcrShifts.length > 1 ? (
+                          <Pressable
+                            onPress={() => {
+                              const allSelected = validOcrShifts.every(({ i }) => selectedOcrIdx.has(i));
+                              setSelectedOcrIdx(
+                                allSelected
+                                  ? new Set()
+                                  : new Set(validOcrShifts.map(({ i }) => i)),
+                              );
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.primary }}>
+                              {validOcrShifts.every(({ i }) => selectedOcrIdx.has(i))
+                                ? "Desselecionar todos"
+                                : "Selecionar todos"}
+                            </Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                      {validOcrShifts.map(({ s, i }) => {
+                        const isSelected = selectedOcrIdx.has(i);
+                        return (
+                          <Pressable
+                            key={i}
+                            onPress={() =>
+                              setSelectedOcrIdx((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(i)) next.delete(i);
+                                else next.add(i);
+                                return next;
+                              })
+                            }
+                            style={({ pressed }) => ({
+                              backgroundColor: isSelected
+                                ? colors.primary + "10"
+                                : pressed ? colors.muted : colors.background,
+                              borderWidth: isSelected ? 2 : 1,
+                              borderColor: isSelected ? colors.primary : colors.border,
+                              borderRadius: colors.radius,
+                              padding: 10,
+                              gap: 2,
+                              flexDirection: "row",
+                              alignItems: "flex-start",
+                            })}
+                          >
+                            <View
+                              style={{
+                                width: 20, height: 20, borderRadius: 4,
+                                borderWidth: 2,
+                                borderColor: isSelected ? colors.primary : colors.border,
+                                backgroundColor: isSelected ? colors.primary : "transparent",
+                                alignItems: "center", justifyContent: "center",
+                                marginTop: 1, marginRight: 8, flexShrink: 0,
+                              }}
+                            >
+                              {isSelected ? <Feather name="check" size={12} color="#fff" /> : null}
+                            </View>
+                            <View style={{ flex: 1, gap: 2 }}>
+                              <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.primary }}>
+                                {s.code ?? "—"}
+                              </Text>
+                              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }} numberOfLines={1}>
+                                {s.startTime} {s.startLocation} → {s.endTime} {s.endLocation}
+                              </Text>
+                              {s.vehicleCode ? (
+                                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.foreground }}>
+                                  {s.vehicleCode}
+                                </Text>
+                              ) : null}
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                      {ocrResult!.warnings.length > 0 ? (
+                        <Text style={[styles.smallHint, { color: colors.mutedForeground }]}>
+                          ⚠ {ocrResult!.warnings[0]}
                         </Text>
                       ) : null}
+                      <PrimaryButton
+                        label={bulkSaving ? "A guardar..." : `Guardar ${selectedOcrIdx.size} serviço(s)`}
+                        onPress={handleBulkSaveParsed}
+                        disabled={selectedOcrIdx.size === 0 || bulkSaving}
+                      />
                     </View>
                   ) : ocrResult && ocrResult.shifts.length === 0 ? (
                     <Text style={[styles.smallHint, { color: colors.destructive }]}>
@@ -798,16 +963,21 @@ export default function NewShiftScreen() {
                             if (codeSuggestHideTimer.current) clearTimeout(codeSuggestHideTimer.current);
                             setCode(s);
                             setCodeFocused(false);
-                            const match = shifts
+                            const matchLocal = shifts
                               .filter((sh) => sh.code?.trim().toUpperCase() === s.toUpperCase())
                               .sort((a, b) => b.date.localeCompare(a.date))[0];
-                            if (match) {
-                              if (match.vehicleCode) applyVehicleCode(match.vehicleCode);
-                              if (match.vehicleKinds?.length) setVehicleKinds(match.vehicleKinds);
-                              const first = match.stops[0];
-                              const last = match.stops[match.stops.length - 1];
+                            if (matchLocal) {
+                              if (matchLocal.vehicleCode) applyVehicleCode(matchLocal.vehicleCode);
+                              if (matchLocal.vehicleKinds?.length) setVehicleKinds(matchLocal.vehicleKinds);
+                              const first = matchLocal.stops[0];
+                              const last = matchLocal.stops[matchLocal.stops.length - 1];
                               if (first?.location) setStart({ location: first.location, time: first.time });
                               if (last?.location) setEnd({ location: last.location, time: last.time });
+                            } else {
+                              const dbT = dbTemplates.find(
+                                (t) => t.code.toUpperCase() === s.toUpperCase(),
+                              );
+                              if (dbT) applyDbTemplate(dbT);
                             }
                           }}
                           style={({ pressed }) => [

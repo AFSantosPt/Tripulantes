@@ -5,6 +5,7 @@ import eventsRouter from "./events";
 import healthRouter from "./health";
 import noticesRouter from "./notices";
 import ocrRouter from "./ocr";
+import serviceTemplatesRouter from "./service-templates";
 import settingsRouter from "./settings";
 import shiftsRouter from "./shifts";
 import swapsRouter from "./swaps";
@@ -18,6 +19,7 @@ router.use(eventsRouter);
 router.use(breakdownsRouter);
 router.use(swapsRouter);
 router.use(shiftsRouter);
+router.use(serviceTemplatesRouter);
 router.use(noticesRouter);
 router.use(settingsRouter);
 

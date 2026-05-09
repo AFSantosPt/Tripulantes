@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { seedAdminIfEmpty } from "./lib/store";
 import { cleanupOldResolvedBreakdowns } from "./routes/breakdowns";
+import { initServiceTemplatesTable } from "./routes/service-templates";
 
 const rawPort = process.env["PORT"];
 
@@ -19,7 +20,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 
-seedAdminIfEmpty()
+Promise.all([seedAdminIfEmpty(), initServiceTemplatesTable()])
   .then(() => {
     app.listen(port, (err) => {
       if (err) {
