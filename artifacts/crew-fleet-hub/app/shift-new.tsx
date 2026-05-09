@@ -92,8 +92,12 @@ function defaultVehicleKinds(categories: string[]): string[] {
 
 function splitVehicleCode(vc: string): { carreira: string; chapa: string } {
   if (!vc) return { carreira: "", chapa: "" };
+  // explicit slash separator: "28E/08" → "28E" + "08"
   const idx = vc.lastIndexOf("/");
   if (idx > 0) return { carreira: vc.slice(0, idx), chapa: vc.slice(idx + 1) };
+  // no slash — split at letter→digit boundary: "15E09" → "15E" + "09"
+  const m = /^(.*[A-Za-z])(\d{2,3})$/.exec(vc);
+  if (m) return { carreira: m[1], chapa: m[2] };
   return { carreira: vc, chapa: "" };
 }
 
