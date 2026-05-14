@@ -1,0 +1,16 @@
+{
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "artifacts/crew-fleet-hub/.expo/web",
+  "framework": "expo",
+  "env": [
+    "DATABASE_URL",
+    "OPENAI_API_KEY",
+    "PORT"
+  ],
+  "functions": {
+    "artifacts/api-server/dist/index.mjs": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  }
+}

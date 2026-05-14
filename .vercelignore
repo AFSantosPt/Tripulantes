@@ -1,0 +1,12 @@
+.git
+.gitignore
+node_modules
+pnpm-lock.yaml
+.replit
+.replit-artifact
+.DS_Store
+*.log
+.env.local
+.env.*.local
+artifacts/mockup-sandbox
+attached_assets
